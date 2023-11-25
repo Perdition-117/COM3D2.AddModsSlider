@@ -612,6 +612,7 @@ public class AddModsSlider : BaseUnityPlugin {
 				uiLabelHeader.trueTypeFont = _font;
 				uiLabelHeader.fontSize = 22;
 				uiLabelHeader.spacingX = 0;
+				uiLabelHeader.alignment = NGUIText.Alignment.Left;
 				uiLabelHeader.multiLine = false;
 				uiLabelHeader.overflowMethod = UILabel.Overflow.ClampContent;
 				uiLabelHeader.supportEncoding = true;
