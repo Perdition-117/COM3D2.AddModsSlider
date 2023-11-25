@@ -8,18 +8,17 @@ using System.Text.RegularExpressions;
 using System.Xml;
 using System.Linq;
 using UnityEngine;
-using UnityInjector.Attributes;
 using UnityEngine.SceneManagement;
+using BepInEx;
 using I2.Loc;
 
 using CM3D2.ExternalSaveData.Managed;
 using CM3D2.ExternalPreset.Managed;
 
-
 namespace CM3D2.AddModsSlider.Plugin {
     //[PluginFilter("CM3D2x64"), PluginFilter("CM3D2x86"), PluginFilter("CM3D2VRx64")]
-    [PluginName("CM3D2 AddModsSlider"), PluginVersion("0.1.3.6")]
-    public class AddModsSlider : UnityInjector.PluginBase {
+	[BepInPlugin("CM3D2.AddModsSlider", "CM3D2 AddModsSlider", "0.1.3.6")]
+	public class AddModsSlider : BaseUnityPlugin {
 
         #region Constants
 
@@ -74,7 +73,7 @@ namespace CM3D2.AddModsSlider.Plugin {
             private readonly string LogLabel = AddModsSlider.PluginName + " : ";
 
             public readonly string DefMatchPattern = @"([-+]?[0-9]*\.?[0-9]+)";
-            public readonly string XmlFileName = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + @"\Config\ModsParam.xml";
+            public readonly string XmlFileName = Path.Combine(Paths.ConfigPath, "ModsParam.xml");
 
 
             public string XmlFormat;
