@@ -20,42 +20,42 @@ public class AddModsSlider : BaseUnityPlugin {
 	public const string PluginName = "AddModsSlider";
 	public const string Version = "0.1.3.6";
 
-	private readonly string LogLabel = PluginName + " : ";
+	private const string MaidVoicePitchPluginId = "CM3D2.MaidVoicePitch";
 
-	private readonly float TimePerInit = 0.10f;
+	private const string LogLabel = PluginName + " : ";
 
-	private readonly int UIRootWidth = 1920; // GemaObject.Find("UI Root").GetComponent<UIRoot>().manualWidth;
-	private readonly int UIRootHeight = 1080; // GemaObject.Find("UI Root").GetComponent<UIRoot>().manualHeight;
-	private readonly int ScrollViewWidth = 550;
-	private readonly int ScrollViewHeight = 860;
+	private const float TimePerInit = 0.10f;
+
+	private const int UIRootWidth = 1920; // GemaObject.Find("UI Root").GetComponent<UIRoot>().manualWidth;
+	private const int UIRootHeight = 1080; // GemaObject.Find("UI Root").GetComponent<UIRoot>().manualHeight;
+	private const int ScrollViewWidth = 550;
+	private const int ScrollViewHeight = 860;
 
 	#endregion
 
 
 	#region Variables
 
-	private bool xmlLoad = false;
-	private bool visible = false;
-	private bool bInitCompleted = false;
+	private bool _xmlLoad = false;
+	private bool _isVisible = false;
+	private bool _isInitialized = false;
 
-	private ModsParam mp;
-	private Dictionary<string, Dictionary<string, float>> undoValue = new();
+	private ModsParam _modsParam;
+	private readonly Dictionary<string, Dictionary<string, float>> _previousValues = new();
 
-	private Maid maid;
-	private GameObject goAMSPanel;
-	private GameObject goScrollView;
-	private GameObject goScrollViewTable;
-	private UICamera uiCamara;
-	private UIPanel uiAMSPanel;
-	private UIPanel uiScrollPanel;
-	private UIScrollView uiScrollView;
-	private UIScrollBar uiScrollBar;
-	private UITable uiTable;
-	private Font font;
-	private Dictionary<string, Transform> trModUnit = new();
-	private Dictionary<string, Dictionary<string, UILabel>> uiValueLable = new();
+	private Maid _currentMaid;
 
-	internal static List<ExternalModsParam> externalModsParamList { get; } = new();
+	private UICamera _uiCamera;
+	private UIPanel _uiPanel;
+	private UIPanel _uiScrollPanel;
+	private UITable _uiTable;
+
+	private Font _font;
+
+	private readonly Dictionary<string, Transform> trModUnit = new();
+	private readonly Dictionary<string, Dictionary<string, UILabel>> _uiValueLabels = new();
+
+	internal static List<ExternalModsParam> ExternalModParameters { get; } = new();
 
 	#endregion
 
@@ -104,29 +104,29 @@ public class AddModsSlider : BaseUnityPlugin {
 
 
 	#region MonoBehaviour methods
-	void Start() {
+	private void Start() {
 		SceneManager.sceneLoaded += OnSceneLoaded;
 
 		ExPreset.loadNotify.AddListener(syncExSaveDatatoSlider);
 	}
 
-	void OnSceneLoaded(Scene scene, LoadSceneMode mode) {
+	private void OnSceneLoaded(Scene scene, LoadSceneMode mode) {
 		if (scene.name == "SceneTitle") {
-			font = GameObject.Find("SystemUI Root").GetComponentsInChildren<UILabel>()[0].trueTypeFont;
+			_font = GameObject.Find("SystemUI Root").GetComponentsInChildren<UILabel>()[0].trueTypeFont;
 		} else if (scene.name == "SceneEdit") {
-			mp = new();
-			if (xmlLoad = mp.Init()) {
-				StartCoroutine(initCoroutine());
+			_modsParam = new();
+			if (_xmlLoad = _modsParam.Init()) {
+				StartCoroutine(InitializeCoroutine());
 			}
 		} else {
-			finalize();
+			Finalize();
 		}
 	}
 
 	public void Update() {
-		if (SceneManager.GetActiveScene().name == "SceneEdit" && bInitCompleted) {
+		if (SceneManager.GetActiveScene().name == "SceneEdit" && _isInitialized) {
 			if (Input.GetKeyDown(KeyCode.F5)) {
-				goAMSPanel.SetActive(visible = !visible);
+				_uiPanel.gameObject.SetActive(_isVisible = !_isVisible);
 				//WriteTrans("UI Root");
 			}
 		}
@@ -139,15 +139,15 @@ public class AddModsSlider : BaseUnityPlugin {
 
 	public void OnClickHeaderButton() {
 		try {
-			var key = getTag(UIButton.current, 1);
-			var b = false;
+			var key = GetTag(UIButton.current, 1);
+			var enabled = false;
 
-			if (mp.IsToggle(key)) {
-				b = !mp.bEnabled[key];
-				mp.bEnabled[key] = b;
-				setExSaveData(key);
+			if (_modsParam.IsToggle(key)) {
+				enabled = !_modsParam.bEnabled[key];
+				_modsParam.bEnabled[key] = enabled;
+				SetExternalSaveData(key);
 
-				notifyMaidVoicePitchOnChange();
+				NotifyMaidVoicePitchOnChange();
 
 				// WIDESLIDER有効化/無効化に合わせて、依存項目UIを表示/非表示
 				if (key == "WIDESLIDER") {
@@ -155,15 +155,15 @@ public class AddModsSlider : BaseUnityPlugin {
 				}
 			}
 
-			if (mp.IsSlider(key)) {
-				if (!mp.IsToggle(key)) {
-					b = UIButton.current.defaultColor.a != 1f;
+			if (_modsParam.IsSlider(key)) {
+				if (!_modsParam.IsToggle(key)) {
+					enabled = UIButton.current.defaultColor.a != 1f;
 				}
 
-				setSliderVisible(key, b);
+				SetSliderVisible(key, enabled);
 			}
 
-			setButtonColor(UIButton.current, b);
+			SetButtonColor(UIButton.current, enabled);
 		} catch (Exception ex) {
 			Debug.Log($"{LogLabel}OnClickToggleHeader() {ex}");
 			return;
@@ -172,20 +172,20 @@ public class AddModsSlider : BaseUnityPlugin {
 
 	public void OnClickUndoAll() {
 		try {
-			foreach (var key in mp.sKey) {
-				if (mp.IsToggle(key)) {
-					mp.bEnabled[key] = undoValue[key]["enable"] == 1f;
-					setExSaveData(key);
-					notifyMaidVoicePitchOnChange();
-					setButtonColor(key, mp.bEnabled[key]);
+			foreach (var key in _modsParam.sKey) {
+				if (_modsParam.IsToggle(key)) {
+					_modsParam.bEnabled[key] = _previousValues[key]["enable"] == 1f;
+					SetExternalSaveData(key);
+					NotifyMaidVoicePitchOnChange();
+					SetButtonColor(key, _modsParam.bEnabled[key]);
 				}
 
-				if (mp.IsSlider(key)) {
-					undoSliderValue(key);
-					setExSaveData(key);
+				if (_modsParam.IsSlider(key)) {
+					UndoSliderValue(key);
+					SetExternalSaveData(key);
 
-					if (mp.IsToggle(key)) {
-						setSliderVisible(key, mp.bEnabled[key]);
+					if (_modsParam.IsToggle(key)) {
+						SetSliderVisible(key, _modsParam.bEnabled[key]);
 					}
 				}
 			}
@@ -196,27 +196,27 @@ public class AddModsSlider : BaseUnityPlugin {
 	}
 
 	public void OnClickUndoButton() {
-		var key = getTag(UIButton.current, 1);
-		undoSliderValue(key);
-		setExSaveData(key);
+		var key = GetTag(UIButton.current, 1);
+		UndoSliderValue(key);
+		SetExternalSaveData(key);
 	}
 
 	public void OnClickResetAll() {
 		try {
-			foreach (var key in mp.sKey) {
-				if (mp.IsToggle(key)) {
-					mp.bEnabled[key] = false;
-					setExSaveData(key);
-					notifyMaidVoicePitchOnChange();
-					setButtonColor(key, mp.bEnabled[key]);
+			foreach (var key in _modsParam.sKey) {
+				if (_modsParam.IsToggle(key)) {
+					_modsParam.bEnabled[key] = false;
+					SetExternalSaveData(key);
+					NotifyMaidVoicePitchOnChange();
+					SetButtonColor(key, _modsParam.bEnabled[key]);
 				}
 
-				if (mp.IsSlider(key)) {
-					resetSliderValue(key);
-					setExSaveData(key);
+				if (_modsParam.IsSlider(key)) {
+					ResetSliderValue(key);
+					SetExternalSaveData(key);
 
-					if (mp.IsToggle(key)) {
-						setSliderVisible(key, mp.bEnabled[key]);
+					if (_modsParam.IsToggle(key)) {
+						SetSliderVisible(key, _modsParam.bEnabled[key]);
 					}
 				}
 			}
@@ -227,25 +227,25 @@ public class AddModsSlider : BaseUnityPlugin {
 	}
 
 	public void OnClickResetButton() {
-		var key = getTag(UIButton.current, 1);
-		resetSliderValue(key);
-		setExSaveData(key);
+		var key = GetTag(UIButton.current, 1);
+		ResetSliderValue(key);
+		SetExternalSaveData(key);
 	}
 
 	public void OnChangeSlider() {
 		try {
-			var key = getTag(UIProgressBar.current, 1);
-			var prop = getTag(UIProgressBar.current, 2);
-			var value = codecSliderValue(key, prop, UIProgressBar.current.value);
-			var vType = mp.sVType[key][prop];
+			var key = GetTag(UIProgressBar.current, 1);
+			var prop = GetTag(UIProgressBar.current, 2);
+			var value = CodecSliderValue(key, prop, UIProgressBar.current.value);
+			var vType = _modsParam.sVType[key][prop];
 
-			uiValueLable[key][prop].text = $"{value:F2}";
-			uiValueLable[key][prop].gameObject.GetComponent<UIInput>().value = uiValueLable[key][prop].text;
-			mp.fValue[key][prop] = value;
+			_uiValueLabels[key][prop].text = $"{value:F2}";
+			_uiValueLabels[key][prop].gameObject.GetComponent<UIInput>().value = _uiValueLabels[key][prop].text;
+			_modsParam.fValue[key][prop] = value;
 
-			setExSaveData(key, prop);
+			SetExternalSaveData(key, prop);
 
-			notifyMaidVoicePitchOnChange();
+			NotifyMaidVoicePitchOnChange();
 
 			//Debug.Log(key +":"+ prop +":"+ value);
 		} catch (Exception ex) {
@@ -256,21 +256,21 @@ public class AddModsSlider : BaseUnityPlugin {
 
 	public void OnSubmitSliderValueInput() {
 		try {
-			var key = getTag(UIInput.current, 1);
-			var prop = getTag(UIInput.current, 2);
+			var key = GetTag(UIInput.current, 1);
+			var prop = GetTag(UIInput.current, 2);
 			UISlider slider = null;
 
 			foreach (Transform t in UIInput.current.transform.parent.parent) {
-				if (getTag(t, 0) == "Slider") {
+				if (GetTag(t, 0) == "Slider") {
 					slider = t.GetComponent<UISlider>();
 				}
 			}
 
 			if (float.TryParse(UIInput.current.value, out var value)) {
-				mp.fValue[key][prop] = value;
-				slider.value = codecSliderValue(key, prop);
-				UIInput.current.value = codecSliderValue(key, prop, slider.value).ToString("F2");
-				uiValueLable[key][prop].text = UIInput.current.value;
+				_modsParam.fValue[key][prop] = value;
+				slider.value = CodecSliderValue(key, prop);
+				UIInput.current.value = CodecSliderValue(key, prop, slider.value).ToString("F2");
+				_uiValueLabels[key][prop].text = UIInput.current.value;
 			}
 		} catch (Exception ex) {
 			Debug.Log($"{LogLabel}OnSubmitSliderValueInput() {ex}");
@@ -283,43 +283,43 @@ public class AddModsSlider : BaseUnityPlugin {
 
 	#region Private methods
 
-	private IEnumerator initCoroutine() {
-		while (!(bInitCompleted = initialize())) {
+	private IEnumerator InitializeCoroutine() {
+		while (!(_isInitialized = Initialize())) {
 			yield return new WaitForSeconds(TimePerInit);
 		}
 
 		Debug.Log(LogLabel + "Initialization complete.");
 	}
 
-	private bool initialize() {
+	private bool Initialize() {
 		try {
-			maid = GameMain.Instance.CharacterMgr.GetMaid(0);
-			if (maid == null) {
+			_currentMaid = GameMain.Instance.CharacterMgr.GetMaid(0);
+			if (_currentMaid == null) {
 				return false;
 			}
 
 			var uiAtlasSceneEdit = FindAtlas("AtlasSceneEdit");
 			var uiAtlasDialog = FindAtlas("SystemDialog");
 
-			var goUIRoot = GameObject.Find("UI Root");
+			var uiRoot = GameObject.Find("UI Root");
 			var cameraObject = GameObject.Find("/UI Root/Camera");
 			var cameraComponent = cameraObject.GetComponent<Camera>();
-			uiCamara = cameraObject.GetComponent<UICamera>();
+			_uiCamera = cameraObject.GetComponent<UICamera>();
 
 			#region createSlider
 
 			// スライダー作成
-			var goTestSliderUnit = new GameObject("TestSliderUnit");
-			SetChild(goUIRoot, goTestSliderUnit);
+			var testSliderUnit = new GameObject("TestSliderUnit");
+			SetChild(uiRoot, testSliderUnit);
 			{
-				var uiTestSliderUnitFrame = goTestSliderUnit.AddComponent<UISprite>();
+				var uiTestSliderUnitFrame = testSliderUnit.AddComponent<UISprite>();
 				uiTestSliderUnitFrame.atlas = uiAtlasSceneEdit;
 				uiTestSliderUnitFrame.spriteName = "cm3d2_edit_slidertitleframe";
 				uiTestSliderUnitFrame.type = UIBasicSprite.Type.Sliced;
 				uiTestSliderUnitFrame.SetDimensions(500, 50);
 
 				// スライダー作成
-				var uiTestSlider = NGUITools.AddChild<UISlider>(goTestSliderUnit);
+				var uiTestSlider = NGUITools.AddChild<UISlider>(testSliderUnit);
 				var uiTestSliderRail = uiTestSlider.gameObject.AddComponent<UISprite>();
 				uiTestSliderRail.name = "Slider";
 				uiTestSliderRail.atlas = uiAtlasSceneEdit;
@@ -351,9 +351,9 @@ public class AddModsSlider : BaseUnityPlugin {
 				NGUITools.UpdateWidgetCollider(uiTestSliderThumb.gameObject);
 
 				// スライダーラベル作成
-				var uiTestSliderLabel = NGUITools.AddChild<UILabel>(goTestSliderUnit);
+				var uiTestSliderLabel = NGUITools.AddChild<UILabel>(testSliderUnit);
 				uiTestSliderLabel.name = "Label";
-				uiTestSliderLabel.trueTypeFont = font;
+				uiTestSliderLabel.trueTypeFont = _font;
 				uiTestSliderLabel.fontSize = 20;
 				uiTestSliderLabel.text = "テストスライダー";
 				uiTestSliderLabel.width = 110;
@@ -362,7 +362,7 @@ public class AddModsSlider : BaseUnityPlugin {
 				uiTestSliderLabel.transform.localPosition = new(-190f, 0f, 0f);
 
 				// 値ラベル・インプット作成
-				var uiTestSliderValueBase = NGUITools.AddChild<UISprite>(goTestSliderUnit);
+				var uiTestSliderValueBase = NGUITools.AddChild<UISprite>(testSliderUnit);
 				uiTestSliderValueBase.name = "ValueBase";
 				uiTestSliderValueBase.atlas = uiAtlasSceneEdit;
 				uiTestSliderValueBase.spriteName = "cm3d2_edit_slidernumberframe";
@@ -374,7 +374,7 @@ public class AddModsSlider : BaseUnityPlugin {
 				uiTestSliderValueLabel.name = "Value";
 				uiTestSliderValueLabel.depth = uiTestSliderValueBase.depth + 1;
 				uiTestSliderValueLabel.width = uiTestSliderValueBase.width;
-				uiTestSliderValueLabel.trueTypeFont = font;
+				uiTestSliderValueLabel.trueTypeFont = _font;
 				uiTestSliderValueLabel.fontSize = 20;
 				uiTestSliderValueLabel.text = "0.00";
 				uiTestSliderValueLabel.color = Color.black;
@@ -391,31 +391,31 @@ public class AddModsSlider : BaseUnityPlugin {
 				uiTestSliderValueInput.gameObject.AddComponent<BoxCollider>();
 				NGUITools.UpdateWidgetCollider(uiTestSliderValueInput.gameObject);
 			}
-			goTestSliderUnit.SetActive(false);
+			testSliderUnit.SetActive(false);
 
 			#endregion
 
 
 			// ボタンはgoProfileTabをコピー
-			var goProfileTabCopy = Instantiate(FindChild(goUIRoot.transform.Find("ProfilePanel").Find("Comment").gameObject, "ProfileTab"));
-			EventDelegate.Remove(goProfileTabCopy.GetComponent<UIButton>().onClick, new EventDelegate.Callback(ProfileMgr.Instance.ChangeCommentTab));
-			goProfileTabCopy.SetActive(false);
+			var profileTabCopy = Instantiate(FindChild(uiRoot.transform.Find("ProfilePanel").Find("Comment").gameObject, "ProfileTab"));
+			EventDelegate.Remove(profileTabCopy.GetComponent<UIButton>().onClick, new EventDelegate.Callback(ProfileMgr.Instance.ChangeCommentTab));
+			profileTabCopy.SetActive(false);
 
 
 			#region createPanel
 
 			// ModsSliderPanel作成
-			var originAMSPanel = new Vector3(UIRootWidth / 2f - 15f - ScrollViewWidth / 2f - 50f, 40f, 0f);
+			var uiPanelPosition = new Vector3(UIRootWidth / 2f - 15f - ScrollViewWidth / 2f - 50f, 40f, 0f);
 			var systemUnitHeight = 30;
 
 			// 親Panel
-			uiAMSPanel = NGUITools.AddChild<UIPanel>(goUIRoot);
-			uiAMSPanel.name = "ModsSliderPanel";
-			uiAMSPanel.transform.localPosition = originAMSPanel;
-			goAMSPanel = uiAMSPanel.gameObject;
+			_uiPanel = NGUITools.AddChild<UIPanel>(uiRoot);
+			_uiPanel.name = "ModsSliderPanel";
+			_uiPanel.transform.localPosition = uiPanelPosition;
+			var goUiPanel = _uiPanel.gameObject;
 
 			// 背景
-			var uiBGSprite = NGUITools.AddChild<UISprite>(goAMSPanel);
+			var uiBGSprite = NGUITools.AddChild<UISprite>(goUiPanel);
 			uiBGSprite.name = "BG";
 			uiBGSprite.atlas = uiAtlasSceneEdit;
 			uiBGSprite.spriteName = "cm3d2_edit_window_l";
@@ -423,15 +423,14 @@ public class AddModsSlider : BaseUnityPlugin {
 			uiBGSprite.SetDimensions(ScrollViewWidth, ScrollViewHeight);
 
 			// ScrollViewPanel
-			uiScrollPanel = NGUITools.AddChild<UIPanel>(goAMSPanel);
-			uiScrollPanel.name = "ScrollView";
-			uiScrollPanel.sortingOrder = uiAMSPanel.sortingOrder + 1;
-			uiScrollPanel.clipping = UIDrawCall.Clipping.SoftClip;
-			uiScrollPanel.SetRect(0f, 0f, uiBGSprite.width, uiBGSprite.height - 110 - systemUnitHeight);
-			uiScrollPanel.transform.localPosition = new(-25f, -systemUnitHeight, 0f);
-			goScrollView = uiScrollPanel.gameObject;
+			_uiScrollPanel = NGUITools.AddChild<UIPanel>(goUiPanel);
+			_uiScrollPanel.name = "ScrollView";
+			_uiScrollPanel.sortingOrder = _uiPanel.sortingOrder + 1;
+			_uiScrollPanel.clipping = UIDrawCall.Clipping.SoftClip;
+			_uiScrollPanel.SetRect(0f, 0f, uiBGSprite.width, uiBGSprite.height - 110 - systemUnitHeight);
+			_uiScrollPanel.transform.localPosition = new(-25f, -systemUnitHeight, 0f);
 
-			uiScrollView = goScrollView.AddComponent<UIScrollView>();
+			var uiScrollView = _uiScrollPanel.gameObject.AddComponent<UIScrollView>();
 			uiScrollView.contentPivot = UIWidget.Pivot.Center;
 			uiScrollView.movement = UIScrollView.Movement.Vertical;
 			uiScrollView.scrollWheelFactor = 1.5f;
@@ -441,7 +440,7 @@ public class AddModsSlider : BaseUnityPlugin {
 			NGUITools.UpdateWidgetCollider(uiBGSprite.gameObject);
 
 			// ScrollBar
-			uiScrollBar = NGUITools.AddChild<UIScrollBar>(goAMSPanel);
+			var uiScrollBar = NGUITools.AddChild<UIScrollBar>(goUiPanel);
 			uiScrollBar.value = 0f;
 			uiScrollBar.gameObject.AddComponent<BoxCollider>();
 			uiScrollBar.transform.localPosition = new(uiBGSprite.width / 2f - 10, 0f, 0f);
@@ -469,20 +468,19 @@ public class AddModsSlider : BaseUnityPlugin {
 			uiScrollView.verticalScrollBar = uiScrollBar;
 
 			// ScrollView内のTable
-			uiTable = NGUITools.AddChild<UITable>(goScrollView);
-			uiTable.pivot = UIWidget.Pivot.Center;
-			uiTable.columns = 1;
-			uiTable.padding = new(25f, 10f);
-			uiTable.hideInactive = true;
-			uiTable.keepWithinPanel = true;
-			uiTable.sorting = UITable.Sorting.Custom;
-			uiTable.onCustomSort = sortGridByXMLOrder;
-			//uiTable.onReposition    = this.OnRepositionTable;
-			goScrollViewTable = uiTable.gameObject;
-			//uiScrollView.centerOnChild = goScrollViewTable.AddComponent<UICenterOnChild>();
+			_uiTable = NGUITools.AddChild<UITable>(_uiScrollPanel.gameObject);
+			_uiTable.pivot = UIWidget.Pivot.Center;
+			_uiTable.columns = 1;
+			_uiTable.padding = new(25f, 10f);
+			_uiTable.hideInactive = true;
+			_uiTable.keepWithinPanel = true;
+			_uiTable.sorting = UITable.Sorting.Custom;
+			_uiTable.onCustomSort = SortGrid;
+			//_uiTable.onReposition    = this.OnRepositionTable;
+			//uiScrollView.centerOnChild = _uiTable.gameObject.AddComponent<UICenterOnChild>();
 
 			// ドラッグ用タブ（タイトル部分）
-			var uiSpriteTitleTab = NGUITools.AddChild<UISprite>(goAMSPanel);
+			var uiSpriteTitleTab = NGUITools.AddChild<UISprite>(goUiPanel);
 			uiSpriteTitleTab.name = "TitleTab";
 			uiSpriteTitleTab.depth = uiBGSprite.depth - 1;
 			uiSpriteTitleTab.atlas = uiAtlasDialog;
@@ -491,11 +489,11 @@ public class AddModsSlider : BaseUnityPlugin {
 			uiSpriteTitleTab.SetDimensions(300, 80);
 			uiSpriteTitleTab.autoResizeBoxCollider = true;
 
-			//uiSpriteTitleTab.gameObject.AddComponent<UIDragObject>().target = goAMSPanel.transform;
+			//uiSpriteTitleTab.gameObject.AddComponent<UIDragObject>().target = uiPanelGameObject.transform;
 			//uiSpriteTitleTab.gameObject.AddComponent<UIDragObject>().dragEffect = UIDragObject.DragEffect.None;
 
 			var uiDragObject = uiSpriteTitleTab.gameObject.AddComponent<UIDragObject>();
-			uiDragObject.target = goAMSPanel.transform;
+			uiDragObject.target = goUiPanel.transform;
 			uiDragObject.dragEffect = UIDragObject.DragEffect.None;
 
 			uiSpriteTitleTab.gameObject.AddComponent<BoxCollider>().isTrigger = true;
@@ -507,30 +505,29 @@ public class AddModsSlider : BaseUnityPlugin {
 			uiLabelTitleTab.depth = uiSpriteTitleTab.depth + 1;
 			uiLabelTitleTab.width = uiSpriteTitleTab.width;
 			uiLabelTitleTab.color = Color.white;
-			uiLabelTitleTab.trueTypeFont = font;
+			uiLabelTitleTab.trueTypeFont = _font;
 			uiLabelTitleTab.fontSize = 18;
 			uiLabelTitleTab.text = "Mods Slider " + Version;
 
-			int conWidth = (int)(uiBGSprite.width - uiTable.padding.x * 2);
-			int baseTop = (int)(uiBGSprite.height / 2f - 50);
+			var controlWidth = (int)(uiBGSprite.width - _uiTable.padding.x * 2);
+			var baseTop = (int)(uiBGSprite.height / 2f - 50);
 
-			var goSystemUnit = NGUITools.AddChild(goAMSPanel);
+			var goSystemUnit = NGUITools.AddChild(goUiPanel);
 			goSystemUnit.name = "System:Undo";
 
 			// Undoボタン
-			var goUndoAll = SetCloneChild(goSystemUnit, goProfileTabCopy, "UndoAll");
-			goUndoAll.transform.localPosition = new(-conWidth * 0.25f - 6, baseTop - systemUnitHeight / 2f, 0f);
+			var goUndoAll = SetCloneChild(goSystemUnit, profileTabCopy, "UndoAll");
+			goUndoAll.transform.localPosition = new(-controlWidth * 0.25f - 6, baseTop - systemUnitHeight / 2f, 0f);
 			goUndoAll.AddComponent<UIDragScrollView>().scrollView = uiScrollView;
 
 			var uiSpriteUndoAll = goUndoAll.GetComponent<UISprite>();
-			uiSpriteUndoAll.SetDimensions((int)(conWidth * 0.5f) - 2, systemUnitHeight);
+			uiSpriteUndoAll.SetDimensions((int)(controlWidth * 0.5f) - 2, systemUnitHeight);
 
 			var uiLabelUndoAll = FindChild(goUndoAll, "Name").GetComponent<UILabel>();
 			// Localize対応。v1.17以前でも動くように
-			var undoAllMonoList = uiLabelUndoAll.GetComponents<MonoBehaviour>();
-			foreach (var mb in undoAllMonoList) {
-				if (mb.GetType().Name == "Localize") {
-					mb.enabled = false;
+			foreach (var monoBehaviour in uiLabelUndoAll.GetComponents<MonoBehaviour>()) {
+				if (monoBehaviour.GetType().Name == "Localize") {
+					monoBehaviour.enabled = false;
 				}
 			}
 			uiLabelUndoAll.width = uiSpriteUndoAll.width - 10;
@@ -550,7 +547,7 @@ public class AddModsSlider : BaseUnityPlugin {
 
 			// Resetボタン
 			var goResetAll = SetCloneChild(goSystemUnit, goUndoAll, "ResetAll");
-			goResetAll.transform.localPosition = new(conWidth * 0.25f - 4, baseTop - systemUnitHeight / 2f, 0f);
+			goResetAll.transform.localPosition = new(controlWidth * 0.25f - 4, baseTop - systemUnitHeight / 2f, 0f);
 
 			var uiLabelResetAll = FindChild(goResetAll, "Name").GetComponent<UILabel>();
 			uiLabelResetAll.text = "[111111]ResetAll";
@@ -568,79 +565,76 @@ public class AddModsSlider : BaseUnityPlugin {
 			// 拡張セーブデータ読込
 			Debug.Log(LogLabel + "Loading ExternalSaveData...");
 			Debug.Log("----------------ExternalSaveData----------------");
-			getExSaveData();
+			GetExternalSaveData();
 			Debug.Log("------------------------------------------------");
 
 
 			#region addTableContents
 
 			// ModsParamの設定に従ってボタン・スライダー追加
-			for (var i = 0; i < mp.KeyCount; i++) {
-				var key = mp.sKey[i];
-
-				if (!mp.bVisible[key]) {
+			foreach (var key in _modsParam.sKey) {
+				if (!_modsParam.bVisible[key]) {
 					continue;
 				}
 
-				uiValueLable[key] = new();
-				var modeDesc = $"{mp.sDescription[key]} ({key})";
+				_uiValueLabels[key] = new();
+				var modDescription = $"{_modsParam.sDescription[key]} ({key})";
 
 				// ModUnit：modタグ単位のまとめオブジェクト ScrollViewGridの子
-				var goModUnit = NGUITools.AddChild(goScrollViewTable);
+				var goModUnit = NGUITools.AddChild(_uiTable.gameObject);
 				goModUnit.name = "Unit:" + key;
 				trModUnit[key] = goModUnit.transform;
 
 				// プロフィールタブ複製・追加
-				var goHeaderButton = SetCloneChild(goModUnit, goProfileTabCopy, "Header:" + key);
+				var goHeaderButton = SetCloneChild(goModUnit, profileTabCopy, "Header:" + key);
 				goHeaderButton.SetActive(true);
 				goHeaderButton.AddComponent<UIDragScrollView>().scrollView = uiScrollView;
 				var uiHeaderButton = goHeaderButton.GetComponent<UIButton>();
 				EventDelegate.Set(uiHeaderButton.onClick, new EventDelegate.Callback(OnClickHeaderButton));
-				setButtonColor(uiHeaderButton, mp.IsToggle(key) && mp.bEnabled[key]);
+				SetButtonColor(uiHeaderButton, _modsParam.IsToggle(key) && _modsParam.bEnabled[key]);
 
 				// 白地Sprite
 				var uiSpriteHeaderButton = goHeaderButton.GetComponent<UISprite>();
 				uiSpriteHeaderButton.type = UIBasicSprite.Type.Sliced;
-				uiSpriteHeaderButton.SetDimensions(conWidth, 40);
+				uiSpriteHeaderButton.SetDimensions(controlWidth, 40);
 
 				var uiLabelHeader = FindChild(goHeaderButton, "Name").GetComponent<UILabel>();
 				uiLabelHeader.width = uiSpriteHeaderButton.width - 20;
 				uiLabelHeader.height = 30;
-				uiLabelHeader.trueTypeFont = font;
+				uiLabelHeader.trueTypeFont = _font;
 				uiLabelHeader.fontSize = 22;
 				uiLabelHeader.spacingX = 0;
 				uiLabelHeader.multiLine = false;
 				uiLabelHeader.overflowMethod = UILabel.Overflow.ClampContent;
 				uiLabelHeader.supportEncoding = true;
-				uiLabelHeader.text = $"[000000]{modeDesc}[-]";
+				uiLabelHeader.text = $"[000000]{modDescription}[-]";
 				uiLabelHeader.gameObject.AddComponent<UIDragScrollView>().scrollView = uiScrollView;
 
 				// 金枠Sprite
 				var uiSpriteHeaderCursor = FindChild(goHeaderButton, "SelectCursor").GetComponent<UISprite>();
-				uiSpriteHeaderCursor.gameObject.SetActive(mp.IsToggle(key) && mp.bEnabled[key]);
+				uiSpriteHeaderCursor.gameObject.SetActive(_modsParam.IsToggle(key) && _modsParam.bEnabled[key]);
 
 				NGUITools.UpdateWidgetCollider(goHeaderButton);
 
 				// スライダーならUndo/Resetボタンとスライダー追加
-				if (mp.IsSlider(key)) {
-					uiSpriteHeaderButton.SetDimensions((int)(conWidth * 0.8f), 40);
+				if (_modsParam.IsSlider(key)) {
+					uiSpriteHeaderButton.SetDimensions((int)(controlWidth * 0.8f), 40);
 					uiLabelHeader.width = uiSpriteHeaderButton.width - 20;
-					uiHeaderButton.transform.localPosition = new(-conWidth * 0.1f, 0f, 0f);
+					uiHeaderButton.transform.localPosition = new(-controlWidth * 0.1f, 0f, 0f);
 
 					// Undoボタン
-					var goUndo = SetCloneChild(goModUnit, goProfileTabCopy, "Undo:" + key);
-					goUndo.transform.localPosition = new(conWidth * 0.4f + 2, 10.5f, 0f);
+					var goUndo = SetCloneChild(goModUnit, profileTabCopy, "Undo:" + key);
+					goUndo.transform.localPosition = new(controlWidth * 0.4f + 2, 10.5f, 0f);
 					goUndo.AddComponent<UIDragScrollView>().scrollView = uiScrollView;
 
 					var uiSpriteUndo = goUndo.GetComponent<UISprite>();
-					uiSpriteUndo.SetDimensions((int)(conWidth * 0.2f) - 2, 19);
+					uiSpriteUndo.SetDimensions((int)(controlWidth * 0.2f) - 2, 19);
 
 					var uiLabelUndo = FindChild(goUndo, "Name").GetComponent<UILabel>();
 					// Localize対応。v1.17以前でも動くように
-					var undoMonoList = uiLabelUndo.GetComponents<MonoBehaviour>();
-					foreach (var mb in undoMonoList) {
-						if (mb.GetType().Name == "Localize") {
-							mb.enabled = false;
+					foreach (var monoBehaviour in uiLabelUndo.GetComponents<MonoBehaviour>()) {
+						if (monoBehaviour.GetType().Name == "Localize") {
+							monoBehaviour.enabled = false;
 						}
 					}
 					uiLabelUndo.width = uiSpriteUndo.width - 10;
@@ -659,19 +653,18 @@ public class AddModsSlider : BaseUnityPlugin {
 					goUndo.SetActive(true);
 
 					// Resetボタン
-					var goReset = SetCloneChild(goModUnit, goProfileTabCopy, "Reset:" + key);
+					var goReset = SetCloneChild(goModUnit, profileTabCopy, "Reset:" + key);
 					goReset.AddComponent<UIDragScrollView>().scrollView = uiScrollView;
-					goReset.transform.localPosition = new(conWidth * 0.4f + 2, -10.5f, 0f);
+					goReset.transform.localPosition = new(controlWidth * 0.4f + 2, -10.5f, 0f);
 
 					var uiSpriteReset = goReset.GetComponent<UISprite>();
-					uiSpriteReset.SetDimensions((int)(conWidth * 0.2f) - 2, 19);
+					uiSpriteReset.SetDimensions((int)(controlWidth * 0.2f) - 2, 19);
 
 					var uiLabelReset = FindChild(goReset, "Name").GetComponent<UILabel>();
 					// Localize対応。v1.17以前でも動くように
-					var resetMonoList = uiLabelReset.GetComponents<MonoBehaviour>();
-					foreach (var mb in resetMonoList) {
-						if (mb.GetType().Name == "Localize") {
-							mb.enabled = false;
+					foreach (var monoBehaviour in uiLabelReset.GetComponents<MonoBehaviour>()) {
+						if (monoBehaviour.GetType().Name == "Localize") {
+							monoBehaviour.enabled = false;
 						}
 					}
 					uiLabelReset.width = uiSpriteReset.width - 10;
@@ -690,32 +683,34 @@ public class AddModsSlider : BaseUnityPlugin {
 					goReset.SetActive(true);
 
 
-					for (var j = 0; j < mp.ValCount(key); j++) {
-						var prop = mp.sPropName[key][j];
+					for (var j = 0; j < _modsParam.sPropName[key].Length; j++) {
+						var prop = _modsParam.sPropName[key][j];
 
-						if (!mp.bVVisible[key][prop]) {
+						if (!_modsParam.bVVisible[key][prop]) {
 							continue;
 						}
 
-						var value = mp.fValue[key][prop];
-						var vmin = mp.fVmin[key][prop];
-						var vmax = mp.fVmax[key][prop];
-						var label = mp.sLabel[key][prop];
-						var vType = mp.sVType[key][prop];
+						var value = _modsParam.fValue[key][prop];
+						var minValue = _modsParam.fVmin[key][prop];
+						var maxValue = _modsParam.fVmax[key][prop];
+						var label = _modsParam.sLabel[key][prop];
+						var valueType = _modsParam.sVType[key][prop];
 
 						// スライダーをModUnitに追加
-						var goSliderUnit = SetCloneChild(goModUnit, goTestSliderUnit, "SliderUnit");
+						var goSliderUnit = SetCloneChild(goModUnit, testSliderUnit, "SliderUnit");
 						goSliderUnit.transform.localPosition = new Vector3(0f, j * -70f - uiSpriteHeaderButton.height - 20f, 0f);
 						goSliderUnit.AddComponent<UIDragScrollView>().scrollView = uiScrollView;
 
 						// フレームサイズ
-						goSliderUnit.GetComponent<UISprite>().SetDimensions(conWidth, 50);
+						goSliderUnit.GetComponent<UISprite>().SetDimensions(controlWidth, 50);
 
 						// スライダー設定
-						UISlider uiModSlider = FindChild(goSliderUnit, "Slider").GetComponent<UISlider>();
+						var uiModSlider = FindChild(goSliderUnit, "Slider").GetComponent<UISlider>();
 						uiModSlider.name = $"Slider:{key}:{prop}";
-						uiModSlider.value = codecSliderValue(key, prop);
-						if (vType == "int") uiModSlider.numberOfSteps = (int)(vmax - vmin + 1);
+						uiModSlider.value = CodecSliderValue(key, prop);
+						if (valueType == "int") {
+							uiModSlider.numberOfSteps = (int)(maxValue - minValue + 1);
+						}
 						EventDelegate.Add(uiModSlider.onChange, new EventDelegate.Callback(OnChangeSlider));
 
 						// スライダーラベル設定
@@ -725,8 +720,8 @@ public class AddModsSlider : BaseUnityPlugin {
 						// スライダー値ラベル参照取得
 						var goValueLabel = FindChild(goSliderUnit, "Value");
 						goValueLabel.name = $"Value:{key}:{prop}";
-						uiValueLable[key][prop] = goValueLabel.GetComponent<UILabel>();
-						uiValueLable[key][prop].multiLine = false;
+						_uiValueLabels[key][prop] = goValueLabel.GetComponent<UILabel>();
+						_uiValueLabels[key][prop].multiLine = false;
 						EventDelegate.Set(goValueLabel.GetComponent<UIInput>().onSubmit, OnSubmitSliderValueInput);
 
 						// スライダー有効状態設定
@@ -742,8 +737,8 @@ public class AddModsSlider : BaseUnityPlugin {
 
 			#endregion
 
-			uiTable.Reposition();
-			goAMSPanel.SetActive(false);
+			_uiTable.Reposition();
+			goUiPanel.SetActive(false);
 
 			//WriteTrans("UI Root");
 		} catch (Exception ex) {
@@ -754,129 +749,138 @@ public class AddModsSlider : BaseUnityPlugin {
 		return true;
 	}
 
-	private void finalize() {
-		bInitCompleted = false;
-		visible = false;
-		mp = null;
+	private void Finalize() {
+		_isInitialized = false;
+		_isVisible = false;
+		_modsParam = null;
 
-		maid = null;
-		goAMSPanel = null;
-		goScrollView = null;
-		goScrollViewTable = null;
+		_currentMaid = null;
 
-		uiValueLable.Clear();
+		_uiValueLabels.Clear();
 	}
 
 	//----
 
-	public void toggleActiveOnWideSlider() => toggleActiveOnWideSlider(mp.bEnabled["WIDESLIDER"]);
-	public void toggleActiveOnWideSlider(bool b) {
+	public void toggleActiveOnWideSlider() => toggleActiveOnWideSlider(_modsParam.bEnabled["WIDESLIDER"]);
+
+	public void toggleActiveOnWideSlider(bool enable) {
 		try {
-			foreach (Transform t in goScrollViewTable.transform) {
-				var goType = getTag(t, 0);
-				var goKey = getTag(t, 1);
+			foreach (Transform transform in _uiTable.gameObject.transform) {
+				var goType = GetTag(transform, 0);
+				var goKey = GetTag(transform, 1);
 
 				if (goType == "System") {
 					continue;
 				}
 
-				if (mp.bOnWideSlider[goKey]) {
-					var s = (b ? "[000000]" : "[FF0000]WS必須 [-]") + $"{mp.sDescription[goKey]} ({goKey})";
-					t.GetComponentsInChildren<UILabel>()[0].text = s;
+				if (_modsParam.bOnWideSlider[goKey]) {
+					var s = (enable ? "[000000]" : "[FF0000]WS必須 [-]") + $"{_modsParam.sDescription[goKey]} ({goKey})";
+					transform.GetComponentsInChildren<UILabel>()[0].text = s;
 
-					var uiButton = t.GetComponentsInChildren<UIButton>()[0];
-					uiButton.isEnabled = b;
-					if (!(b && mp.IsSlider(goKey))) setButtonColor(uiButton, b && mp.bEnabled[goKey]);
+					var uiButton = transform.GetComponentsInChildren<UIButton>()[0];
+					uiButton.isEnabled = enable;
+					if (!(enable && _modsParam.IsSlider(goKey))) {
+						SetButtonColor(uiButton, enable && _modsParam.bEnabled[goKey]);
+					}
 
-					if (!b) {
-						foreach (Transform tc in t) {
-							var gocType = getTag(tc, 0);
+					if (!enable) {
+						foreach (Transform transformChild in transform) {
+							var gocType = GetTag(transformChild, 0);
 							if (gocType == "SliderUnit" || gocType == "Spacer") {
-								tc.gameObject.SetActive(b);
+								transformChild.gameObject.SetActive(enable);
 							}
 						}
 					}
 				}
 			}
-			uiTable.repositionNow = true;
+
+			_uiTable.repositionNow = true;
 		} catch (Exception ex) {
 			Debug.Log($"{LogLabel}toggleActiveOnWideSlider() {ex}");
 		}
 	}
 
-	private void undoSliderValue(string key) {
+	private void UndoSliderValue(string key) {
 		try {
-			foreach (Transform tr in trModUnit[key]) {
-				if (tr.name == "SliderUnit") {
-					var slider = FindChildByTag(tr, "Slider").GetComponent<UISlider>();
-					var prop = getTag(slider, 2);
+			foreach (Transform transform in trModUnit[key]) {
+				if (transform.name == "SliderUnit") {
+					var slider = FindChildByTag(transform, "Slider").GetComponent<UISlider>();
+					var prop = GetTag(slider, 2);
 
-					mp.fValue[key][prop] = undoValue[key][prop];
-					slider.value = codecSliderValue(key, prop);
+					_modsParam.fValue[key][prop] = _previousValues[key][prop];
 
-					uiValueLable[key][prop].text = $"{codecSliderValue(key, prop, slider.value):F2}";
-					uiValueLable[key][prop].gameObject.GetComponent<UIInput>().value = uiValueLable[key][prop].text;
-					//Debug.LogWarning(key + "#"+ getTag(slider, 2) +" = "+ undoValue[key][prop]);
+					SetSliderValue(slider, key);
 				}
 			}
 		} catch (Exception ex) {
-			Debug.Log($"{LogLabel}undoSliderValue() {ex}");
+			Debug.Log($"{LogLabel}UndoSliderValue() {ex}");
 		}
 	}
 
-	private void resetSliderValue(string key) {
+	private void ResetSliderValue(string key) {
 		try {
-			foreach (Transform tr in trModUnit[key]) {
-				if (tr.name == "SliderUnit") {
-					var slider = FindChildByTag(tr, "Slider").GetComponent<UISlider>();
-					var prop = getTag(slider, 2);
+			foreach (Transform transform in trModUnit[key]) {
+				if (transform.name == "SliderUnit") {
+					var slider = FindChildByTag(transform, "Slider").GetComponent<UISlider>();
+					var prop = GetTag(slider, 2);
 
-					mp.fValue[key][prop] = mp.fVdef[key][prop];
-					slider.value = codecSliderValue(key, prop);
+					_modsParam.fValue[key][prop] = _modsParam.fVdef[key][prop];
 
-					uiValueLable[key][prop].text = $"{codecSliderValue(key, prop, slider.value):F2}";
-					uiValueLable[key][prop].gameObject.GetComponent<UIInput>().value = uiValueLable[key][prop].text;
-
-					//Debug.LogWarning(key + "#"+ getTag(slider, 2) +" = "+ mp.fVdef[key][prop]);
+					SetSliderValue(slider, key);
 				}
 			}
 		} catch (Exception ex) {
-			Debug.Log($"{LogLabel}resetSliderValue() {ex}");
+			Debug.Log($"{LogLabel}ResetSliderValue() {ex}");
 		}
 	}
 
+	private void SetSliderValue(UISlider slider, string key) {
+		var prop = GetTag(slider, 2);
 
-	private int sortGridByXMLOrder(Transform t1, Transform t2) {
+		slider.value = CodecSliderValue(key, prop);
+
+		var text = $"{CodecSliderValue(key, prop, slider.value):F2}";
+		_uiValueLabels[key][prop].text = text;
+		_uiValueLabels[key][prop].gameObject.GetComponent<UIInput>().value = text;
+
+		//Debug.LogWarning($"{key}#{prop} = {_modsParam.fValue[key][prop]}");
+	}
+
+
+	private static readonly Dictionary<string, int> GridSortOrder = new() {
+		{"System", -1},
+		{"Unit", 0},
+		{"Panel", 1},
+		{"Header", 2},
+		{"Slider", 3},
+		{"Spacer", 4}
+	};
+
+	private int SortGrid(Transform t1, Transform t2) {
 		try {
-			var type1 = t1.name.Split(':')[0];
-			var type2 = t2.name.Split(':')[0];
-			var key1 = t1.name.Split(':')[1];
-			var key2 = t2.name.Split(':')[1];
-			var n = mp.sKey.IndexOf(key1);
-			var m = mp.sKey.IndexOf(key2);
+			var tName1 = t1.name.Split(':');
+			var tName2 = t2.name.Split(':');
+
+			var type1 = tName1[0];
+			var type2 = tName2[0];
+			var key1 = tName1[1];
+			var key2 = tName2[1];
+			var key1Pos = _modsParam.sKey.IndexOf(key1);
+			var key2Pos = _modsParam.sKey.IndexOf(key2);
 
 			//Debug.Log(t1.name +" comp "+ t2.name);
 
-			var order = new Dictionary<string, int>() {
-				{"System", -1},
-				{"Unit", 0},
-				{"Panel", 1},
-				{"Header", 2},
-				{"Slider", 3},
-				{"Spacer", 4}
-			};
-
-			if (n == m) {
+			if (key1Pos == key2Pos) {
 				if (type1 == "Slider" && type2 == "Slider") {
-					var l = Array.IndexOf(mp.sPropName[key1], t1.name.Split(':')[2]);
-					var k = Array.IndexOf(mp.sPropName[key2], t2.name.Split(':')[2]);
+					var l = Array.IndexOf(_modsParam.sPropName[key1], tName1[2]);
+					var k = Array.IndexOf(_modsParam.sPropName[key2], tName2[2]);
 
 					return l - k;
 				} else {
-					return order[type1] - order[type2];
+					return GridSortOrder[type1] - GridSortOrder[type2];
 				}
 			} else {
-				return n - m;
+				return key1Pos - key2Pos;
 			}
 		} catch (Exception ex) {
 			Debug.Log($"{LogLabel}sortGridByXMLOrder() {ex}");
@@ -884,117 +888,111 @@ public class AddModsSlider : BaseUnityPlugin {
 		}
 	}
 
-	private void setSliderVisible(string key, bool b) {
-		foreach (Transform tc in trModUnit[key]) {
-			var type = getTag(tc, 0);
-			if (type == "SliderUnit" || type == "Spacer") tc.gameObject.SetActive(b);
+	private void SetSliderVisible(string key, bool enable) {
+		foreach (Transform transform in trModUnit[key]) {
+			var type = GetTag(transform, 0);
+			if (type == "SliderUnit" || type == "Spacer") transform.gameObject.SetActive(enable);
 		}
 
-		uiTable.repositionNow = true;
+		_uiTable.repositionNow = true;
 	}
 
-	private void setButtonColor(string key, bool b) {
-		setButtonColor(FindChild(trModUnit[key], "Header:" + key).GetComponent<UIButton>(), b);
+	private void SetButtonColor(string key, bool b) {
+		SetButtonColor(FindChild(trModUnit[key], "Header:" + key).GetComponent<UIButton>(), b);
 	}
-	private void setButtonColor(UIButton button, bool b) {
+
+	private void SetButtonColor(UIButton button, bool enable) {
 		var color = button.defaultColor;
 
-		if (mp.IsToggle(getTag(button, 1))) {
-			button.defaultColor = new(color.r, color.g, color.b, b ? 1f : 0.5f);
-			FindChild(button.gameObject, "SelectCursor").SetActive(b);
+		if (_modsParam.IsToggle(GetTag(button, 1))) {
+			button.defaultColor = new(color.r, color.g, color.b, enable ? 1f : 0.5f);
+			FindChild(button.gameObject, "SelectCursor").SetActive(enable);
 		} else {
-			button.defaultColor = new(color.r, color.g, color.b, b ? 1f : 0.75f);
+			button.defaultColor = new(color.r, color.g, color.b, enable ? 1f : 0.75f);
 		}
 	}
 
-	private void windowTweenFinished() {
-		goScrollView.SetActive(true);
+	private void WindowTweenFinished() {
+		_uiScrollPanel.gameObject.SetActive(true);
 	}
 
-	private string getTag(Component co, int n) => getTag(co.gameObject, n);
-	private string getTag(GameObject go, int n) {
-		return (go.name.Split(':') != null) ? go.name.Split(':')[n] : "";
+	private string GetTag(Component component, int n) => GetTag(component.gameObject, n);
+
+	private string GetTag(GameObject gameObject, int n) {
+		return (gameObject.name.Split(':') != null) ? gameObject.name.Split(':')[n] : "";
 	}
 
-	private float codecSliderValue(string key, string prop) {
-		var value = mp.fValue[key][prop];
-		var vmin = mp.fVmin[key][prop];
-		var vmax = mp.fVmax[key][prop];
-		var vType = mp.sVType[key][prop];
+	private float CodecSliderValue(string key, string prop) {
+		var value = _modsParam.fValue[key][prop];
+		var minValue = _modsParam.fVmin[key][prop];
+		var maxValue = _modsParam.fVmax[key][prop];
+		var valueType = _modsParam.sVType[key][prop];
 
-		if (value < vmin) value = vmin;
-		if (value > vmax) value = vmax;
+		Math.Max(value, minValue);
+		Math.Min(value, maxValue);
 
-		if (vType == "scale" && vmin < 1f) {
-			if (vmin < 0f) vmin = 0f;
-			if (value < 0f) value = 0f;
+		if (valueType == "scale" && minValue < 1f) {
+			Math.Max(minValue, 0f);
+			Math.Max(value, 0f);
 
-			return (value < 1f) ? (value - vmin) / (1f - vmin) * 0.5f : 0.5f + (value - 1f) / (vmax - 1f) * 0.5f;
-		} else if (vType == "int") {
-			var dvalue = (decimal)value;
-			var dvmin = (decimal)vmin;
-			var dvmax = (decimal)vmax;
+			return (value < 1f) ? (value - minValue) / (1f - minValue) * 0.5f : 0.5f + (value - 1f) / (maxValue - 1f) * 0.5f;
+		} else if (valueType == "int") {
+			var minValueDecimal = (decimal)minValue;
 
-			return (float)Math.Round((dvalue - dvmin) / (dvmax - dvmin), 1, MidpointRounding.AwayFromZero);
+			return (float)Math.Round(((decimal)value - minValueDecimal) / ((decimal)maxValue - minValueDecimal), 1, MidpointRounding.AwayFromZero);
 		} else {
-			return (value - vmin) / (vmax - vmin);
+			return (value - minValue) / (maxValue - minValue);
 		}
 	}
 
-	private float codecSliderValue(string key, string prop, float value) {
-		var vmin = mp.fVmin[key][prop];
-		var vmax = mp.fVmax[key][prop];
-		var vType = mp.sVType[key][prop];
+	private float CodecSliderValue(string key, string prop, float value) {
+		var minValue = _modsParam.fVmin[key][prop];
+		var maxValue = _modsParam.fVmax[key][prop];
+		var valueType = _modsParam.sVType[key][prop];
 
-		if (value < 0f) value = 0f;
-		if (value > 1f) value = 1f;
+		Math.Max(value, 0f);
+		Math.Min(value, 1f);
 
-		if (vType == "scale" && vmin < 1f) {
-			if (vmin < 0f) vmin = 0f;
-			if (value < 0f) value = 0f;
+		if (valueType == "scale" && minValue < 1f) {
+			Math.Max(minValue, 0f);
+			Math.Max(value, 0f);
 
-			return (value < 0.5f) ? vmin + (1f - vmin) * value * 2f : 1 + (vmax - 1f) * (value - 0.5f) * 2;
-		} else if (vType == "int") {
-			var dvalue = (decimal)value;
-			var dvmin = (decimal)vmin;
-			var dvmax = (decimal)vmax;
-
-			return (float)Math.Round(vmin + (vmax - vmin) * value, 0, MidpointRounding.AwayFromZero);
+			return (value < 0.5f) ? minValue + (1f - minValue) * value * 2f : 1 + (maxValue - 1f) * (value - 0.5f) * 2;
+		} else if (valueType == "int") {
+			return (float)Math.Round(minValue + (maxValue - minValue) * value, 0, MidpointRounding.AwayFromZero);
 		} else {
-			return vmin + (vmax - vmin) * value;
+			return minValue + (maxValue - minValue) * value;
 		}
 	}
 
 
 	//--------
 
-	private void notifyMaidVoicePitchOnChange() {
+	private void NotifyMaidVoicePitchOnChange() {
 		gameObject.SendMessage("MaidVoicePitch_UpdateSliders");
 	}
 
 	public void syncExSaveDatatoSlider() {
 		Debug.Log(LogLabel + "Loading ExternalPresetData...");
 		Debug.Log("----------------ExternalPresetData----------------");
-		getExSaveData();
+		GetExternalSaveData();
 		Debug.Log("------------------------------------------------");
 		try {
-			for (var i = 0; i < mp.KeyCount; i++) {
-				var key = mp.sKey[i];
-
-				foreach (Transform tr in trModUnit[key]) {
-					if (mp.IsToggle(key)) {
-						setButtonColor(key, mp.bEnabled[key]);
+			foreach (var key in _modsParam.sKey) {
+				foreach (Transform transform in trModUnit[key]) {
+					if (_modsParam.IsToggle(key)) {
+						SetButtonColor(key, _modsParam.bEnabled[key]);
 					}
 
-					if (mp.IsSlider(key)) {
-						if (tr.name == "SliderUnit") {
-							var slider = FindChildByTag(tr, "Slider").GetComponent<UISlider>();
-							var prop = getTag(slider, 2);
+					if (_modsParam.IsSlider(key)) {
+						if (transform.name == "SliderUnit") {
+							var slider = FindChildByTag(transform, "Slider").GetComponent<UISlider>();
+							var prop = GetTag(slider, 2);
 
-							slider.value = codecSliderValue(key, prop);
-							uiValueLable[key][prop].text = $"{codecSliderValue(key, prop, slider.value):F2}";
-							uiValueLable[key][prop].gameObject.GetComponent<UIInput>().value = uiValueLable[key][prop].text;
-							//Debug.LogWarning(key + "#"+ getTag(slider, 2) +" = "+ mp.fVdef[key][prop]);
+							slider.value = CodecSliderValue(key, prop);
+							_uiValueLabels[key][prop].text = $"{CodecSliderValue(key, prop, slider.value):F2}";
+							_uiValueLabels[key][prop].gameObject.GetComponent<UIInput>().value = _uiValueLabels[key][prop].text;
+							//Debug.LogWarning($"{key}#{getTag(slider, 2)} = {_modsParam.fVdef[key][prop]}");
 						}
 					}
 				}
@@ -1005,60 +1003,53 @@ public class AddModsSlider : BaseUnityPlugin {
 	}
 
 
-	private void getExSaveData() {
-		var plugin = "CM3D2.MaidVoicePitch";
-		for (var i = 0; i < mp.KeyCount; i++) {
-			var key = mp.sKey[i];
-			undoValue[key] = new();
+	private void GetExternalSaveData() {
+		foreach (var key in _modsParam.sKey) {
+			_previousValues[key] = new();
 
-			if (mp.IsToggle(key)) {
-				mp.bEnabled[key] = ExSaveData.GetBool(maid, plugin, key, false);
-				undoValue[key]["enable"] = mp.bEnabled[key] ? 1f : 0f;
-				Debug.Log($"{key,-32} = {mp.bEnabled[key],-16}");
+			if (_modsParam.IsToggle(key)) {
+				_modsParam.bEnabled[key] = ExSaveData.GetBool(_currentMaid, MaidVoicePitchPluginId, key, false);
+				_previousValues[key]["enable"] = _modsParam.bEnabled[key] ? 1f : 0f;
+				Debug.Log($"{key,-32} = {_modsParam.bEnabled[key],-16}");
 			}
 
-			if (mp.IsSlider(key)) {
-				for (var j = 0; j < mp.ValCount(key); j++) {
-					var prop = mp.sPropName[key][j];
-					var f = ExSaveData.GetFloat(maid, plugin, prop, float.NaN);
-					mp.fValue[key][prop] = float.IsNaN(f) ? mp.fVdef[key][prop] : f;
-					undoValue[key][prop] = mp.fValue[key][prop];
+			if (_modsParam.IsSlider(key)) {
+				foreach (var prop in _modsParam.sPropName[key]) {
+					var f = ExSaveData.GetFloat(_currentMaid, MaidVoicePitchPluginId, prop, float.NaN);
+					_modsParam.fValue[key][prop] = float.IsNaN(f) ? _modsParam.fVdef[key][prop] : f;
+					_previousValues[key][prop] = _modsParam.fValue[key][prop];
 
-					Debug.Log($"{prop,-32} = {mp.fValue[key][prop]:f}");
+					Debug.Log($"{prop,-32} = {_modsParam.fValue[key][prop]:f}");
 				}
-				if (!mp.IsToggle(key)) {
-					mp.bEnabled[key] = true;
+				if (!_modsParam.IsToggle(key)) {
+					_modsParam.bEnabled[key] = true;
 				}
 			}
 		}
 	}
 
-	private void setExSaveData() {
-		for (var i = 0; i < mp.KeyCount; i++) {
-			setExSaveData(mp.sKey[i]);
+	private void SetExternalSaveData() {
+		foreach (var key in _modsParam.sKey) {
+			SetExternalSaveData(key);
 		}
 	}
 
-	private void setExSaveData(string key) {
-		var plugin = "CM3D2.MaidVoicePitch";
-
-		if (mp.IsToggle(key)) {
-			ExSaveData.SetBool(maid, plugin, key, mp.bEnabled[key]);
+	private void SetExternalSaveData(string key) {
+		if (_modsParam.IsToggle(key)) {
+			ExSaveData.SetBool(_currentMaid, MaidVoicePitchPluginId, key, _modsParam.bEnabled[key]);
 		}
 
-		if (mp.IsSlider(key)) {
-			for (var j = 0; j < mp.ValCount(key); j++) {
-				setExSaveData(key, mp.sPropName[key][j]);
+		if (_modsParam.IsSlider(key)) {
+			foreach (var prop in _modsParam.sPropName[key]) {
+				SetExternalSaveData(key, prop);
 			}
 		}
 	}
 
-	private void setExSaveData(string key, string prop) {
-		var plugin = "CM3D2.MaidVoicePitch";
+	private void SetExternalSaveData(string key, string prop) {
+		var value = (float)Math.Round(_modsParam.fValue[key][prop], 3, MidpointRounding.AwayFromZero);
 
-		var value = (float)Math.Round(mp.fValue[key][prop], 3, MidpointRounding.AwayFromZero);
-
-		ExSaveData.SetFloat(maid, plugin, prop, value);
+		ExSaveData.SetFloat(_currentMaid, MaidVoicePitchPluginId, prop, value);
 	}
 
 	#endregion
@@ -1066,37 +1057,39 @@ public class AddModsSlider : BaseUnityPlugin {
 
 	#region Utility methods
 
-	internal static Transform FindParent(Transform tr, string s) => FindParent(tr.gameObject, s).transform;
-	internal static GameObject FindParent(GameObject go, string name) {
-		if (go == null) {
+	internal static Transform FindParent(Transform transform, string name) => FindParent(transform.gameObject, name).transform;
+
+	internal static GameObject FindParent(GameObject gameObject, string name) {
+		if (gameObject == null) {
 			return null;
 		}
 
-		var _parent = go.transform.parent;
-		while (_parent) {
-			if (_parent.name == name) {
-				return _parent.gameObject;
+		var parent = gameObject.transform.parent;
+		while (parent) {
+			if (parent.name == name) {
+				return parent.gameObject;
 			}
-			_parent = _parent.parent;
+			parent = parent.parent;
 		}
 
 		return null;
 	}
 
-	internal static Transform FindChild(Transform tr, string s) => FindChild(tr.gameObject, s).transform;
-	internal static GameObject FindChild(GameObject go, string s) {
-		if (go == null) {
+	internal static Transform FindChild(Transform transform, string name) => FindChild(transform.gameObject, name).transform;
+
+	internal static GameObject FindChild(GameObject gameObject, string name) {
+		if (gameObject == null) {
 			return null;
 		}
 
 		GameObject target = null;
 
-		foreach (Transform tc in go.transform) {
-			if (tc.gameObject.name == s) {
-				return tc.gameObject;
+		foreach (Transform transform in gameObject.transform) {
+			if (transform.gameObject.name == name) {
+				return transform.gameObject;
 			}
 
-			target = FindChild(tc.gameObject, s);
+			target = FindChild(transform.gameObject, name);
 			if (target) {
 				return target;
 			}
@@ -1105,20 +1098,21 @@ public class AddModsSlider : BaseUnityPlugin {
 		return null;
 	}
 
-	internal static Transform FindChildByTag(Transform tr, string s) => FindChildByTag(tr.gameObject, s).transform;
-	internal static GameObject FindChildByTag(GameObject go, string s) {
-		if (go == null) {
+	internal static Transform FindChildByTag(Transform transform, string tag) => FindChildByTag(transform.gameObject, tag).transform;
+
+	internal static GameObject FindChildByTag(GameObject gameObject, string tag) {
+		if (gameObject == null) {
 			return null;
 		}
 
 		GameObject target = null;
 
-		foreach (Transform tc in go.transform) {
-			if (tc.gameObject.name.Contains(s)) {
-				return tc.gameObject;
+		foreach (Transform transform in gameObject.transform) {
+			if (transform.gameObject.name.Contains(tag)) {
+				return transform.gameObject;
 			}
 
-			target = FindChild(tc.gameObject, s);
+			target = FindChild(transform.gameObject, tag);
 			if (target) {
 				return target;
 			}
@@ -1126,7 +1120,6 @@ public class AddModsSlider : BaseUnityPlugin {
 
 		return null;
 	}
-
 
 	internal static void SetChild(GameObject parent, GameObject child) {
 		child.layer = parent.layer;
@@ -1153,7 +1146,7 @@ public class AddModsSlider : BaseUnityPlugin {
 		child.SetActive(false);
 	}
 
-	internal static void DestoryChild(GameObject parent, string name) {
+	internal static void DestroyChild(GameObject parent, string name) {
 		var child = FindChild(parent, name);
 		if (child) {
 			child.transform.parent = null;
@@ -1161,58 +1154,61 @@ public class AddModsSlider : BaseUnityPlugin {
 		}
 	}
 
-	internal static UIAtlas FindAtlas(string s) {
-		return new List<UIAtlas>(Resources.FindObjectsOfTypeAll<UIAtlas>()).FirstOrDefault(a => a.name == s);
+	internal static UIAtlas FindAtlas(string name) {
+		return new List<UIAtlas>(Resources.FindObjectsOfTypeAll<UIAtlas>()).FirstOrDefault(a => a.name == name);
 	}
 
-	internal static void WriteTrans(string s) {
-		var go = GameObject.Find(s);
-		if (!go) {
+	internal static void WriteTransform(string name) {
+		var gameObject = GameObject.Find(name);
+		if (!gameObject) {
 			return;
 		}
 
-		WriteTrans(go.transform, 0, null);
+		WriteTransform(gameObject.transform, 0, null);
 	}
-	internal static void WriteTrans(Transform t) => WriteTrans(t, 0, null);
-	internal static void WriteTrans(Transform t, int level, StreamWriter writer) {
-		if (level == 0) writer = new($".\\{t.name}.txt", false);
+
+	internal static void WriteTransform(Transform transform) => WriteTransform(transform, 0, null);
+
+	internal static void WriteTransform(Transform transform, int level, StreamWriter writer) {
+		if (level == 0) {
+			writer = new($".\\{transform.name}.txt", false);
+		}
+
 		if (writer == null) {
 			return;
 		}
 
-		var s = "";
-		for (var i = 0; i < level; i++) {
-			s += "    ";
+		var indentation = new string(' ', 4 * Math.Max(0, level));
+
+		writer.WriteLine(indentation + level + "," + transform.name);
+		foreach (Transform transformChild in transform) {
+			WriteTransform(transformChild, level + 1, writer);
 		}
 
-		writer.WriteLine(s + level + "," + t.name);
-		foreach (Transform tc in t) {
-			WriteTrans(tc, level + 1, writer);
-		}
-
-		if (level == 0) writer.Close();
-	}
-
-	internal static void WriteChildrenComponent(GameObject go) {
-		WriteComponent(go);
-
-		foreach (Transform tc in go.transform) {
-			WriteChildrenComponent(tc.gameObject);
+		if (level == 0) {
+			writer.Close();
 		}
 	}
 
-	internal static void WriteComponent(GameObject go) {
-		var compos = go.GetComponents<Component>();
-		foreach (var c in compos) {
-			Debug.Log($"{go.name}:{c.GetType().Name}");
+	internal static void WriteChildrenComponent(GameObject gameObject) {
+		WriteComponent(gameObject);
+
+		foreach (Transform transform in gameObject.transform) {
+			WriteChildrenComponent(transform.gameObject);
+		}
+	}
+
+	internal static void WriteComponent(GameObject gameObject) {
+		foreach (var component in gameObject.GetComponents<Component>()) {
+			Debug.Log($"{gameObject.name}:{component.GetType().Name}");
 		}
 	}
 
 	#endregion
 
 	#region Public methods
-	static public void AddExternalModsParam(ExternalModsParam emp) {
-		externalModsParamList.Add(emp);
+	public static void AddExternalModsParam(ExternalModsParam modsParam) {
+		ExternalModParameters.Add(modsParam);
 	}
 	#endregion
 }

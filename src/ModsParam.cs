@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Xml;
 using BepInEx;
 using UnityEngine;
@@ -34,27 +33,24 @@ internal class ModsParam {
 	public Dictionary<string, Dictionary<string, string>> sMatchPattern = new();
 	public Dictionary<string, Dictionary<string, bool>> bVVisible = new();
 
-	public int KeyCount => sKey.Count;
-	public int ValCount(string key) => sPropName[key].Length;
-
 	//--------
 
 	public ModsParam() { }
 
 	public bool Init() {
-		if (!loadModsParamXML()) {
-			Debug.LogError(LogLabel + "loadModsParamXML() failed.");
+		if (!LoadModParameters()) {
+			Debug.LogError(LogLabel + "LoadModParameters() failed.");
 			return false;
 		}
-		ApplyExternalModsParam();
+		ApplyExternalModParameters();
 		foreach (var key in sKey) {
-			CheckWS(key);
+			CheckWideSlider(key);
 		}
 
 		return true;
 	}
 
-	public bool CheckWS(string key) {
+	public bool CheckWideSlider(string key) {
 		return !bOnWideSlider[key] || (sKey.Contains("WIDESLIDER") && bEnabled["WIDESLIDER"]);
 	}
 
@@ -68,7 +64,7 @@ internal class ModsParam {
 
 	//--------
 
-	private bool loadModsParamXML() {
+	private bool LoadModParameters() {
 		if (!File.Exists(XmlFileName)) {
 			Debug.LogError($"{LogLabel}\"{XmlFileName}\" does not exist.");
 			return false;
@@ -80,21 +76,21 @@ internal class ModsParam {
 		var mods = (XmlNode)doc.DocumentElement;
 		XmlFormat = ((XmlElement)mods).GetAttribute("format");
 		if (XmlFormat != "1.2" && XmlFormat != "1.21") {
-			Debug.LogError($"{LogLabel}{AddModsSlider.Version} requires fomart=\"1.2\" or \"1.21\" of ModsParam.xml.");
+			Debug.LogError($"{LogLabel}{AddModsSlider.Version} requires format=\"1.2\" or \"1.21\" of ModsParam.xml.");
 			return false;
 		}
 
-		var modNodeS = mods.SelectNodes("/mods/mod");
-		if (!(modNodeS.Count > 0)) {
+		var modNodes = mods.SelectNodes("/mods/mod");
+		if (!(modNodes.Count > 0)) {
 			Debug.LogError($"{LogLabel} \"{XmlFileName}\" has no <mod>elements.");
 			return false;
 		}
 
 		sKey.Clear();
 
-		foreach (XmlNode modNode in modNodeS) {
+		foreach (XmlElement modNode in modNodes) {
 			// mod属性
-			var key = ((XmlElement)modNode).GetAttribute("id");
+			var key = modNode.GetAttribute("id");
 			if (key != "" && !sKey.Contains(key)) {
 				sKey.Add(key);
 			} else {
@@ -103,11 +99,11 @@ internal class ModsParam {
 
 			var b = false;
 			bEnabled[key] = false;
-			sDescription[key] = ((XmlElement)modNode).GetAttribute("description");
-			bOnWideSlider[key] = bool.TryParse(((XmlElement)modNode).GetAttribute("on_wideslider"), out b) ? b : false;
-			bVisible[key] = bool.TryParse(((XmlElement)modNode).GetAttribute("visible"), out b) ? b : true;
+			sDescription[key] = modNode.GetAttribute("description");
+			bOnWideSlider[key] = bool.TryParse(modNode.GetAttribute("on_wideslider"), out b) ? b : false;
+			bVisible[key] = bool.TryParse(modNode.GetAttribute("visible"), out b) ? b : true;
 
-			sType[key] = ((XmlElement)modNode).GetAttribute("type");
+			sType[key] = modNode.GetAttribute("type");
 			switch (sType[key]) {
 				case "toggle": break;
 				case "toggle,slider": break;
@@ -118,12 +114,12 @@ internal class ModsParam {
 				continue;
 			}
 
-			var valueNodeS = ((XmlElement)modNode).GetElementsByTagName("value");
-			if (!(valueNodeS.Count > 0)) {
+			var valueNodes = modNode.GetElementsByTagName("value");
+			if (!(valueNodes.Count > 0)) {
 				continue;
 			}
 
-			sPropName[key] = new string[valueNodeS.Count];
+			sPropName[key] = new string[valueNodes.Count];
 			fValue[key] = new();
 			fVmin[key] = new();
 			fVmax[key] = new();
@@ -135,10 +131,10 @@ internal class ModsParam {
 
 			// value属性
 			var j = 0;
-			foreach (XmlNode valueNode in valueNodeS) {
+			foreach (XmlElement valueNode in valueNodes) {
 				var x = 0f;
 
-				string prop = ((XmlElement)valueNode).GetAttribute("prop_name");
+				string prop = valueNode.GetAttribute("prop_name");
 				if (prop != "" && Array.IndexOf(sPropName[key], prop) < 0) {
 					sPropName[key][j] = prop;
 				} else {
@@ -146,7 +142,7 @@ internal class ModsParam {
 					break;
 				}
 
-				sVType[key][prop] = ((XmlElement)valueNode).GetAttribute("type");
+				sVType[key][prop] = valueNode.GetAttribute("type");
 				switch (sVType[key][prop]) {
 					case "num": break;
 					case "scale": break;
@@ -154,9 +150,9 @@ internal class ModsParam {
 					default: sVType[key][prop] = "num"; break;
 				}
 
-				fVmin[key][prop] = float.TryParse(((XmlElement)valueNode).GetAttribute("min"), out x) ? x : 0f;
-				fVmax[key][prop] = float.TryParse(((XmlElement)valueNode).GetAttribute("max"), out x) ? x : 0f;
-				fVdef[key][prop] = float.TryParse(((XmlElement)valueNode).GetAttribute("default"), out x) ? x : float.NaN;
+				fVmin[key][prop] = float.TryParse(valueNode.GetAttribute("min"), out x) ? x : 0f;
+				fVmax[key][prop] = float.TryParse(valueNode.GetAttribute("max"), out x) ? x : 0f;
+				fVdef[key][prop] = float.TryParse(valueNode.GetAttribute("default"), out x) ? x : float.NaN;
 				if (float.IsNaN(fVdef[key][prop])) {
 					fVdef[key][prop] = sVType[key][prop] switch {
 						"num" => 0f,
@@ -168,9 +164,9 @@ internal class ModsParam {
 
 				fValue[key][prop] = fVdef[key][prop];
 
-				sLabel[key][prop] = ((XmlElement)valueNode).GetAttribute("label");
-				sMatchPattern[key][prop] = ((XmlElement)valueNode).GetAttribute("match_pattern");
-				bVVisible[key][prop] = bool.TryParse(((XmlElement)valueNode).GetAttribute("visible"), out b) ? b : true;
+				sLabel[key][prop] = valueNode.GetAttribute("label");
+				sMatchPattern[key][prop] = valueNode.GetAttribute("match_pattern");
+				bVVisible[key][prop] = bool.TryParse(valueNode.GetAttribute("visible"), out b) ? b : true;
 
 				j++;
 			}
@@ -182,33 +178,33 @@ internal class ModsParam {
 		return true;
 	}
 
-	private void ApplyExternalModsParam() {
-		foreach (var emp in AddModsSlider.externalModsParamList) {
-			var key = emp.sKey;
+	private void ApplyExternalModParameters() {
+		foreach (var modsParam in AddModsSlider.ExternalModParameters) {
+			var key = modsParam.sKey;
 			if (string.IsNullOrEmpty(key) || sKey.Contains(key)) {
 				return;
 			}
 
-			if (!string.IsNullOrEmpty(emp.sInsertID) && sKey.IndexOf(emp.sInsertID) != -1) {
-				sKey.Insert(sKey.IndexOf(emp.sInsertID), emp.sKey);
+			if (!string.IsNullOrEmpty(modsParam.sInsertID) && sKey.Contains(modsParam.sInsertID)) {
+				sKey.Insert(sKey.IndexOf(modsParam.sInsertID), modsParam.sKey);
 			} else {
 				sKey.Add(key);
 			}
 			bEnabled[key] = false;
-			sDescription[key] = emp.sDescription;
-			bOnWideSlider[key] = emp.bOnWideSlider;
-			sType[key] = emp.sType;
+			sDescription[key] = modsParam.sDescription;
+			bOnWideSlider[key] = modsParam.bOnWideSlider;
+			sType[key] = modsParam.sType;
 			bVisible[key] = true;
 
 			if (!IsSlider(key)) {
 				continue;
 			}
 
-			if (emp.lValueList == null || emp.lValueList.Count == 0) {
+			if (modsParam.lValueList == null || modsParam.lValueList.Count == 0) {
 				sKey.Remove(key);
 				continue;
 			}
-			sPropName[key] = new string[emp.lValueList.Count];
+			sPropName[key] = new string[modsParam.lValueList.Count];
 			fValue[key] = new();
 			fVmin[key] = new();
 			fVmax[key] = new();
@@ -216,9 +212,10 @@ internal class ModsParam {
 			sVType[key] = new();
 			sLabel[key] = new();
 			bVVisible[key] = new();
+
 			var i = 0;
-			foreach (var empValue in emp.lValueList) {
-				var prop = empValue.sPropName;
+			foreach (var modsParamValue in modsParam.lValueList) {
+				var prop = modsParamValue.sPropName;
 				if (string.IsNullOrEmpty(prop) || Array.IndexOf(sPropName[key], prop) >= 0) {
 					sKey.Remove(key);
 					break;
@@ -226,12 +223,12 @@ internal class ModsParam {
 
 				sPropName[key][i] = prop;
 				i++;
-				sVType[key][prop] = empValue.sType;
-				fVmin[key][prop] = empValue.fMin;
-				fVmax[key][prop] = empValue.fMax;
-				fVdef[key][prop] = empValue.fDef;
-				fValue[key][prop] = empValue.fDef;
-				sLabel[key][prop] = empValue.sLabel;
+				sVType[key][prop] = modsParamValue.sType;
+				fVmin[key][prop] = modsParamValue.fMin;
+				fVmax[key][prop] = modsParamValue.fMax;
+				fVdef[key][prop] = modsParamValue.fDef;
+				fValue[key][prop] = modsParamValue.fDef;
+				sLabel[key][prop] = modsParamValue.sLabel;
 				bVVisible[key][prop] = true;
 			}
 		}
