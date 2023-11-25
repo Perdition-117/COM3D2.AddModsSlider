@@ -40,8 +40,7 @@ public class AddModsSlider : BaseUnityPlugin {
 	private bool _isVisible = false;
 	private bool _isInitialized = false;
 
-	private ModsParam _modsParam;
-	private readonly Dictionary<string, Dictionary<string, float>> _previousValues = new();
+	private ModParameters _modParameters;
 
 	private Maid _currentMaid;
 
@@ -52,8 +51,8 @@ public class AddModsSlider : BaseUnityPlugin {
 
 	private Font _font;
 
-	private readonly Dictionary<string, Transform> trModUnit = new();
-	private readonly Dictionary<string, Dictionary<string, UILabel>> _uiValueLabels = new();
+	private readonly List<ModControl> _modControls = new();
+	private readonly Dictionary<string, ModControl> _modControlsDictionary = new();
 
 	internal static List<ExternalModsParam> ExternalModParameters { get; } = new();
 
@@ -114,8 +113,8 @@ public class AddModsSlider : BaseUnityPlugin {
 		if (scene.name == "SceneTitle") {
 			_font = GameObject.Find("SystemUI Root").GetComponentsInChildren<UILabel>()[0].trueTypeFont;
 		} else if (scene.name == "SceneEdit") {
-			_modsParam = new();
-			if (_xmlLoad = _modsParam.Init()) {
+			_modParameters = new();
+			if (_xmlLoad = _modParameters.Init()) {
 				StartCoroutine(InitializeCoroutine());
 			}
 		} else {
@@ -142,9 +141,11 @@ public class AddModsSlider : BaseUnityPlugin {
 			var key = GetTag(UIButton.current, 1);
 			var enabled = false;
 
-			if (_modsParam.IsToggle(key)) {
-				enabled = !_modsParam.bEnabled[key];
-				_modsParam.bEnabled[key] = enabled;
+			var parameter = _modParameters.GetParameter(key);
+
+			if (parameter.IsToggle()) {
+				enabled = !parameter.Enabled;
+				parameter.Enabled = enabled;
 				SetExternalSaveData(key);
 
 				NotifyMaidVoicePitchOnChange();
@@ -155,8 +156,8 @@ public class AddModsSlider : BaseUnityPlugin {
 				}
 			}
 
-			if (_modsParam.IsSlider(key)) {
-				if (!_modsParam.IsToggle(key)) {
+			if (parameter.IsSlider()) {
+				if (!parameter.IsToggle()) {
 					enabled = UIButton.current.defaultColor.a != 1f;
 				}
 
@@ -172,20 +173,22 @@ public class AddModsSlider : BaseUnityPlugin {
 
 	public void OnClickUndoAll() {
 		try {
-			foreach (var key in _modsParam.sKey) {
-				if (_modsParam.IsToggle(key)) {
-					_modsParam.bEnabled[key] = _previousValues[key]["enable"] == 1f;
+			foreach (var parameter in _modParameters.Parameters) {
+				var key = parameter.Name;
+
+				if (parameter.IsToggle()) {
+					parameter.Enabled = parameter.WasEnabled;
 					SetExternalSaveData(key);
 					NotifyMaidVoicePitchOnChange();
-					SetButtonColor(key, _modsParam.bEnabled[key]);
+					SetButtonColor(key, parameter.Enabled);
 				}
 
-				if (_modsParam.IsSlider(key)) {
+				if (parameter.IsSlider()) {
 					UndoSliderValue(key);
 					SetExternalSaveData(key);
 
-					if (_modsParam.IsToggle(key)) {
-						SetSliderVisible(key, _modsParam.bEnabled[key]);
+					if (parameter.IsToggle()) {
+						SetSliderVisible(key, parameter.Enabled);
 					}
 				}
 			}
@@ -203,20 +206,22 @@ public class AddModsSlider : BaseUnityPlugin {
 
 	public void OnClickResetAll() {
 		try {
-			foreach (var key in _modsParam.sKey) {
-				if (_modsParam.IsToggle(key)) {
-					_modsParam.bEnabled[key] = false;
+			foreach (var parameter in _modParameters.Parameters) {
+				var key = parameter.Name;
+
+				if (parameter.IsToggle()) {
+					parameter.Enabled = false;
 					SetExternalSaveData(key);
 					NotifyMaidVoicePitchOnChange();
-					SetButtonColor(key, _modsParam.bEnabled[key]);
+					SetButtonColor(key, parameter.Enabled);
 				}
 
-				if (_modsParam.IsSlider(key)) {
+				if (parameter.IsSlider()) {
 					ResetSliderValue(key);
 					SetExternalSaveData(key);
 
-					if (_modsParam.IsToggle(key)) {
-						SetSliderVisible(key, _modsParam.bEnabled[key]);
+					if (parameter.IsToggle()) {
+						SetSliderVisible(key, parameter.Enabled);
 					}
 				}
 			}
@@ -236,12 +241,16 @@ public class AddModsSlider : BaseUnityPlugin {
 		try {
 			var key = GetTag(UIProgressBar.current, 1);
 			var prop = GetTag(UIProgressBar.current, 2);
-			var value = CodecSliderValue(key, prop, UIProgressBar.current.value);
-			var vType = _modsParam.sVType[key][prop];
 
-			_uiValueLabels[key][prop].text = $"{value:F2}";
-			_uiValueLabels[key][prop].gameObject.GetComponent<UIInput>().value = _uiValueLabels[key][prop].text;
-			_modsParam.fValue[key][prop] = value;
+			var modControl = _modControlsDictionary[key];
+
+			var value = modControl.CodecSliderValue(prop, UIProgressBar.current.value);
+
+			modControl.Parameter.SetPropertyValue(prop, value);
+
+			var text = value.ToString("F2");
+			modControl.Labels[prop].text = text;
+			modControl.Labels[prop].gameObject.GetComponent<UIInput>().value = text;
 
 			SetExternalSaveData(key, prop);
 
@@ -266,11 +275,16 @@ public class AddModsSlider : BaseUnityPlugin {
 				}
 			}
 
+			var modControl = _modControlsDictionary[key];
+
 			if (float.TryParse(UIInput.current.value, out var value)) {
-				_modsParam.fValue[key][prop] = value;
-				slider.value = CodecSliderValue(key, prop);
-				UIInput.current.value = CodecSliderValue(key, prop, slider.value).ToString("F2");
-				_uiValueLabels[key][prop].text = UIInput.current.value;
+				modControl.Parameter.SetPropertyValue(prop, value);
+
+				slider.value = modControl.CodecSliderValue(prop);
+
+				var text = modControl.CodecSliderValue(prop, slider.value).ToString("F2");
+				UIInput.current.value = text;
+				modControl.Labels[prop].text = text;
 			}
 		} catch (Exception ex) {
 			Debug.Log($"{LogLabel}OnSubmitSliderValueInput() {ex}");
@@ -572,18 +586,25 @@ public class AddModsSlider : BaseUnityPlugin {
 			#region addTableContents
 
 			// ModsParamの設定に従ってボタン・スライダー追加
-			foreach (var key in _modsParam.sKey) {
-				if (!_modsParam.bVisible[key]) {
+			foreach (var parameter in _modParameters.Parameters) {
+				var key = parameter.Name;
+
+				if (!parameter.Visible) {
 					continue;
 				}
 
-				_uiValueLabels[key] = new();
-				var modDescription = $"{_modsParam.sDescription[key]} ({key})";
+				var modControl = new ModControl();
+				_modControls.Add(modControl);
+				_modControlsDictionary.Add(key, modControl);
+
+				modControl.Parameter = parameter;
+
+				var modDescription = $"{parameter.Description} ({key})";
 
 				// ModUnit：modタグ単位のまとめオブジェクト ScrollViewGridの子
 				var goModUnit = NGUITools.AddChild(_uiTable.gameObject);
 				goModUnit.name = "Unit:" + key;
-				trModUnit[key] = goModUnit.transform;
+				modControl.ModUnit = goModUnit.transform;
 
 				// プロフィールタブ複製・追加
 				var goHeaderButton = SetCloneChild(goModUnit, profileTabCopy, "Header:" + key);
@@ -591,7 +612,7 @@ public class AddModsSlider : BaseUnityPlugin {
 				goHeaderButton.AddComponent<UIDragScrollView>().scrollView = uiScrollView;
 				var uiHeaderButton = goHeaderButton.GetComponent<UIButton>();
 				EventDelegate.Set(uiHeaderButton.onClick, new EventDelegate.Callback(OnClickHeaderButton));
-				SetButtonColor(uiHeaderButton, _modsParam.IsToggle(key) && _modsParam.bEnabled[key]);
+				SetButtonColor(uiHeaderButton, parameter.IsToggle() && parameter.Enabled);
 
 				// 白地Sprite
 				var uiSpriteHeaderButton = goHeaderButton.GetComponent<UISprite>();
@@ -612,12 +633,12 @@ public class AddModsSlider : BaseUnityPlugin {
 
 				// 金枠Sprite
 				var uiSpriteHeaderCursor = FindChild(goHeaderButton, "SelectCursor").GetComponent<UISprite>();
-				uiSpriteHeaderCursor.gameObject.SetActive(_modsParam.IsToggle(key) && _modsParam.bEnabled[key]);
+				uiSpriteHeaderCursor.gameObject.SetActive(parameter.IsToggle() && parameter.Enabled);
 
 				NGUITools.UpdateWidgetCollider(goHeaderButton);
 
 				// スライダーならUndo/Resetボタンとスライダー追加
-				if (_modsParam.IsSlider(key)) {
+				if (parameter.IsSlider()) {
 					uiSpriteHeaderButton.SetDimensions((int)(controlWidth * 0.8f), 40);
 					uiLabelHeader.width = uiSpriteHeaderButton.width - 20;
 					uiHeaderButton.transform.localPosition = new(-controlWidth * 0.1f, 0f, 0f);
@@ -683,22 +704,24 @@ public class AddModsSlider : BaseUnityPlugin {
 					goReset.SetActive(true);
 
 
-					for (var j = 0; j < _modsParam.sPropName[key].Length; j++) {
-						var prop = _modsParam.sPropName[key][j];
+					for (var j = 0; j < parameter.PropertyNames.Count; j++) {
+						var prop = parameter.PropertyNames[j];
 
-						if (!_modsParam.bVVisible[key][prop]) {
+						var property = parameter.Properties[prop];
+
+						if (!property.Visible) {
 							continue;
 						}
 
-						var value = _modsParam.fValue[key][prop];
-						var minValue = _modsParam.fVmin[key][prop];
-						var maxValue = _modsParam.fVmax[key][prop];
-						var label = _modsParam.sLabel[key][prop];
-						var valueType = _modsParam.sVType[key][prop];
+						var value = property.Value;
+						var minValue = property.MinValue;
+						var maxValue = property.MaxValue;
+						var label = property.Label;
+						var valueType = property.Type;
 
 						// スライダーをModUnitに追加
 						var goSliderUnit = SetCloneChild(goModUnit, testSliderUnit, "SliderUnit");
-						goSliderUnit.transform.localPosition = new Vector3(0f, j * -70f - uiSpriteHeaderButton.height - 20f, 0f);
+						goSliderUnit.transform.localPosition = new(0f, j * -70f - uiSpriteHeaderButton.height - 20f, 0f);
 						goSliderUnit.AddComponent<UIDragScrollView>().scrollView = uiScrollView;
 
 						// フレームサイズ
@@ -707,7 +730,7 @@ public class AddModsSlider : BaseUnityPlugin {
 						// スライダー設定
 						var uiModSlider = FindChild(goSliderUnit, "Slider").GetComponent<UISlider>();
 						uiModSlider.name = $"Slider:{key}:{prop}";
-						uiModSlider.value = CodecSliderValue(key, prop);
+						uiModSlider.value = modControl.CodecSliderValue(prop);
 						if (valueType == "int") {
 							uiModSlider.numberOfSteps = (int)(maxValue - minValue + 1);
 						}
@@ -720,12 +743,12 @@ public class AddModsSlider : BaseUnityPlugin {
 						// スライダー値ラベル参照取得
 						var goValueLabel = FindChild(goSliderUnit, "Value");
 						goValueLabel.name = $"Value:{key}:{prop}";
-						_uiValueLabels[key][prop] = goValueLabel.GetComponent<UILabel>();
-						_uiValueLabels[key][prop].multiLine = false;
+						modControl.Labels[prop] = goValueLabel.GetComponent<UILabel>();
+						modControl.Labels[prop].multiLine = false;
 						EventDelegate.Set(goValueLabel.GetComponent<UIInput>().onSubmit, OnSubmitSliderValueInput);
 
 						// スライダー有効状態設定
-						//goSliderUnit.SetActive( !mp.IsToggle(key) || mp.bEnabled[key] && mp.CheckWS(key) );
+						//goSliderUnit.SetActive( !parameter.IsToggle() || parameter.Enabled && parameter.CheckWideSlider() );
 						goSliderUnit.SetActive(false);
 					}
 				}
@@ -752,16 +775,17 @@ public class AddModsSlider : BaseUnityPlugin {
 	private void Finalize() {
 		_isInitialized = false;
 		_isVisible = false;
-		_modsParam = null;
+		_modParameters = null;
 
 		_currentMaid = null;
 
-		_uiValueLabels.Clear();
+		_modControls.Clear();
+		_modControlsDictionary.Clear();
 	}
 
 	//----
 
-	public void toggleActiveOnWideSlider() => toggleActiveOnWideSlider(_modsParam.bEnabled["WIDESLIDER"]);
+	public void toggleActiveOnWideSlider() => toggleActiveOnWideSlider(_modParameters.WideSliderIsEnabled());
 
 	public void toggleActiveOnWideSlider(bool enable) {
 		try {
@@ -773,14 +797,16 @@ public class AddModsSlider : BaseUnityPlugin {
 					continue;
 				}
 
-				if (_modsParam.bOnWideSlider[goKey]) {
-					var s = (enable ? "[000000]" : "[FF0000]WS必須 [-]") + $"{_modsParam.sDescription[goKey]} ({goKey})";
+				var parameter = _modParameters.GetParameter(goKey);
+
+				if (parameter.OnWideSlider) {
+					var s = (enable ? "[000000]" : "[FF0000]WS必須 [-]") + $"{parameter.Description} ({goKey})";
 					transform.GetComponentsInChildren<UILabel>()[0].text = s;
 
 					var uiButton = transform.GetComponentsInChildren<UIButton>()[0];
 					uiButton.isEnabled = enable;
-					if (!(enable && _modsParam.IsSlider(goKey))) {
-						SetButtonColor(uiButton, enable && _modsParam.bEnabled[goKey]);
+					if (!(enable && parameter.IsSlider())) {
+						SetButtonColor(uiButton, enable && parameter.Enabled);
 					}
 
 					if (!enable) {
@@ -802,14 +828,15 @@ public class AddModsSlider : BaseUnityPlugin {
 
 	private void UndoSliderValue(string key) {
 		try {
-			foreach (Transform transform in trModUnit[key]) {
+			var modControl = _modControlsDictionary[key];
+			foreach (Transform transform in modControl.ModUnit) {
 				if (transform.name == "SliderUnit") {
 					var slider = FindChildByTag(transform, "Slider").GetComponent<UISlider>();
 					var prop = GetTag(slider, 2);
 
-					_modsParam.fValue[key][prop] = _previousValues[key][prop];
+					modControl.Parameter.UndoPropertyValue(prop);
 
-					SetSliderValue(slider, key);
+					SetSliderValue(slider, modControl);
 				}
 			}
 		} catch (Exception ex) {
@@ -819,14 +846,15 @@ public class AddModsSlider : BaseUnityPlugin {
 
 	private void ResetSliderValue(string key) {
 		try {
-			foreach (Transform transform in trModUnit[key]) {
+			var modControl = _modControlsDictionary[key];
+			foreach (Transform transform in modControl.ModUnit) {
 				if (transform.name == "SliderUnit") {
 					var slider = FindChildByTag(transform, "Slider").GetComponent<UISlider>();
 					var prop = GetTag(slider, 2);
 
-					_modsParam.fValue[key][prop] = _modsParam.fVdef[key][prop];
+					modControl.Parameter.ResetPropertyValue(prop);
 
-					SetSliderValue(slider, key);
+					SetSliderValue(slider, modControl);
 				}
 			}
 		} catch (Exception ex) {
@@ -834,26 +862,26 @@ public class AddModsSlider : BaseUnityPlugin {
 		}
 	}
 
-	private void SetSliderValue(UISlider slider, string key) {
+	private void SetSliderValue(UISlider slider, ModControl modControl) {
 		var prop = GetTag(slider, 2);
 
-		slider.value = CodecSliderValue(key, prop);
+		slider.value = modControl.CodecSliderValue(prop);
 
-		var text = $"{CodecSliderValue(key, prop, slider.value):F2}";
-		_uiValueLabels[key][prop].text = text;
-		_uiValueLabels[key][prop].gameObject.GetComponent<UIInput>().value = text;
+		var text = $"{modControl.CodecSliderValue(prop, slider.value):F2}";
+		modControl.Labels[prop].text = text;
+		modControl.Labels[prop].gameObject.GetComponent<UIInput>().value = text;
 
-		//Debug.LogWarning($"{key}#{prop} = {_modsParam.fValue[key][prop]}");
+		//Debug.LogWarning($"{key}#{prop} = {valueSource[key][prop]}");
 	}
 
 
 	private static readonly Dictionary<string, int> GridSortOrder = new() {
-		{"System", -1},
-		{"Unit", 0},
-		{"Panel", 1},
-		{"Header", 2},
-		{"Slider", 3},
-		{"Spacer", 4}
+		["System"] = -1,
+		["Unit"] = 0,
+		["Panel"] = 1,
+		["Header"] = 2,
+		["Slider"] = 3,
+		["Spacer"] = 4,
 	};
 
 	private int SortGrid(Transform t1, Transform t2) {
@@ -865,15 +893,19 @@ public class AddModsSlider : BaseUnityPlugin {
 			var type2 = tName2[0];
 			var key1 = tName1[1];
 			var key2 = tName2[1];
-			var key1Pos = _modsParam.sKey.IndexOf(key1);
-			var key2Pos = _modsParam.sKey.IndexOf(key2);
+
+			var parameter1 = _modParameters.GetParameter(key1);
+			var parameter2 = _modParameters.GetParameter(key2);
+
+			var key1Pos = _modParameters.Parameters.IndexOf(parameter1);
+			var key2Pos = _modParameters.Parameters.IndexOf(parameter2);
 
 			//Debug.Log(t1.name +" comp "+ t2.name);
 
 			if (key1Pos == key2Pos) {
 				if (type1 == "Slider" && type2 == "Slider") {
-					var l = Array.IndexOf(_modsParam.sPropName[key1], tName1[2]);
-					var k = Array.IndexOf(_modsParam.sPropName[key2], tName2[2]);
+					var l = parameter1.PropertyNames.IndexOf(tName1[2]);
+					var k = parameter2.PropertyNames.IndexOf(tName2[2]);
 
 					return l - k;
 				} else {
@@ -889,7 +921,7 @@ public class AddModsSlider : BaseUnityPlugin {
 	}
 
 	private void SetSliderVisible(string key, bool enable) {
-		foreach (Transform transform in trModUnit[key]) {
+		foreach (Transform transform in _modControlsDictionary[key].ModUnit) {
 			var type = GetTag(transform, 0);
 			if (type == "SliderUnit" || type == "Spacer") transform.gameObject.SetActive(enable);
 		}
@@ -897,18 +929,19 @@ public class AddModsSlider : BaseUnityPlugin {
 		_uiTable.repositionNow = true;
 	}
 
-	private void SetButtonColor(string key, bool b) {
-		SetButtonColor(FindChild(trModUnit[key], "Header:" + key).GetComponent<UIButton>(), b);
+	private void SetButtonColor(string key, bool enabled) {
+		SetButtonColor(FindChild(_modControlsDictionary[key].ModUnit, "Header:" + key).GetComponent<UIButton>(), enabled);
 	}
 
-	private void SetButtonColor(UIButton button, bool enable) {
+	private void SetButtonColor(UIButton button, bool enabled) {
 		var color = button.defaultColor;
 
-		if (_modsParam.IsToggle(GetTag(button, 1))) {
-			button.defaultColor = new(color.r, color.g, color.b, enable ? 1f : 0.5f);
-			FindChild(button.gameObject, "SelectCursor").SetActive(enable);
+		var parameter = _modParameters.GetParameter(GetTag(button, 1));
+		if (parameter.IsToggle()) {
+			button.defaultColor = new(color.r, color.g, color.b, enabled ? 1f : 0.5f);
+			FindChild(button.gameObject, "SelectCursor").SetActive(enabled);
 		} else {
-			button.defaultColor = new(color.r, color.g, color.b, enable ? 1f : 0.75f);
+			button.defaultColor = new(color.r, color.g, color.b, enabled ? 1f : 0.75f);
 		}
 	}
 
@@ -920,49 +953,6 @@ public class AddModsSlider : BaseUnityPlugin {
 
 	private string GetTag(GameObject gameObject, int n) {
 		return (gameObject.name.Split(':') != null) ? gameObject.name.Split(':')[n] : "";
-	}
-
-	private float CodecSliderValue(string key, string prop) {
-		var value = _modsParam.fValue[key][prop];
-		var minValue = _modsParam.fVmin[key][prop];
-		var maxValue = _modsParam.fVmax[key][prop];
-		var valueType = _modsParam.sVType[key][prop];
-
-		Math.Max(value, minValue);
-		Math.Min(value, maxValue);
-
-		if (valueType == "scale" && minValue < 1f) {
-			Math.Max(minValue, 0f);
-			Math.Max(value, 0f);
-
-			return (value < 1f) ? (value - minValue) / (1f - minValue) * 0.5f : 0.5f + (value - 1f) / (maxValue - 1f) * 0.5f;
-		} else if (valueType == "int") {
-			var minValueDecimal = (decimal)minValue;
-
-			return (float)Math.Round(((decimal)value - minValueDecimal) / ((decimal)maxValue - minValueDecimal), 1, MidpointRounding.AwayFromZero);
-		} else {
-			return (value - minValue) / (maxValue - minValue);
-		}
-	}
-
-	private float CodecSliderValue(string key, string prop, float value) {
-		var minValue = _modsParam.fVmin[key][prop];
-		var maxValue = _modsParam.fVmax[key][prop];
-		var valueType = _modsParam.sVType[key][prop];
-
-		Math.Max(value, 0f);
-		Math.Min(value, 1f);
-
-		if (valueType == "scale" && minValue < 1f) {
-			Math.Max(minValue, 0f);
-			Math.Max(value, 0f);
-
-			return (value < 0.5f) ? minValue + (1f - minValue) * value * 2f : 1 + (maxValue - 1f) * (value - 0.5f) * 2;
-		} else if (valueType == "int") {
-			return (float)Math.Round(minValue + (maxValue - minValue) * value, 0, MidpointRounding.AwayFromZero);
-		} else {
-			return minValue + (maxValue - minValue) * value;
-		}
 	}
 
 
@@ -978,21 +968,20 @@ public class AddModsSlider : BaseUnityPlugin {
 		GetExternalSaveData();
 		Debug.Log("------------------------------------------------");
 		try {
-			foreach (var key in _modsParam.sKey) {
-				foreach (Transform transform in trModUnit[key]) {
-					if (_modsParam.IsToggle(key)) {
-						SetButtonColor(key, _modsParam.bEnabled[key]);
+			foreach (var modControl in _modControls) {
+				var parameter = modControl.Parameter;
+				var key = parameter.Name;
+
+				foreach (Transform transform in modControl.ModUnit) {
+					if (parameter.IsToggle()) {
+						SetButtonColor(key, parameter.Enabled);
 					}
 
-					if (_modsParam.IsSlider(key)) {
+					if (parameter.IsSlider()) {
 						if (transform.name == "SliderUnit") {
 							var slider = FindChildByTag(transform, "Slider").GetComponent<UISlider>();
-							var prop = GetTag(slider, 2);
-
-							slider.value = CodecSliderValue(key, prop);
-							_uiValueLabels[key][prop].text = $"{CodecSliderValue(key, prop, slider.value):F2}";
-							_uiValueLabels[key][prop].gameObject.GetComponent<UIInput>().value = _uiValueLabels[key][prop].text;
-							//Debug.LogWarning($"{key}#{getTag(slider, 2)} = {_modsParam.fVdef[key][prop]}");
+							SetSliderValue(slider, modControl);
+							//Debug.LogWarning($"{key}#{getTag(slider, 2)} = {parameter.Values[prop].Default}");
 						}
 					}
 				}
@@ -1004,50 +993,52 @@ public class AddModsSlider : BaseUnityPlugin {
 
 
 	private void GetExternalSaveData() {
-		foreach (var key in _modsParam.sKey) {
-			_previousValues[key] = new();
-
-			if (_modsParam.IsToggle(key)) {
-				_modsParam.bEnabled[key] = ExSaveData.GetBool(_currentMaid, MaidVoicePitchPluginId, key, false);
-				_previousValues[key]["enable"] = _modsParam.bEnabled[key] ? 1f : 0f;
-				Debug.Log($"{key,-32} = {_modsParam.bEnabled[key],-16}");
+		foreach (var parameter in _modParameters.Parameters) {
+			if (parameter.IsToggle()) {
+				parameter.Enabled = ExSaveData.GetBool(_currentMaid, MaidVoicePitchPluginId, parameter.Name, false);
+				parameter.WasEnabled = parameter.Enabled;
+				Debug.Log($"{parameter.Name,-32} = {parameter.Enabled,-16}");
 			}
 
-			if (_modsParam.IsSlider(key)) {
-				foreach (var prop in _modsParam.sPropName[key]) {
+			if (parameter.IsSlider()) {
+				foreach (var prop in parameter.PropertyNames) {
+					var property = parameter.Properties[prop];
 					var f = ExSaveData.GetFloat(_currentMaid, MaidVoicePitchPluginId, prop, float.NaN);
-					_modsParam.fValue[key][prop] = float.IsNaN(f) ? _modsParam.fVdef[key][prop] : f;
-					_previousValues[key][prop] = _modsParam.fValue[key][prop];
+					property.Value = float.IsNaN(f) ? property.DefaultValue : f;
+					property.PreviousValue = property.Value;
 
-					Debug.Log($"{prop,-32} = {_modsParam.fValue[key][prop]:f}");
+					Debug.Log($"{prop,-32} = {property.Value:f}");
 				}
-				if (!_modsParam.IsToggle(key)) {
-					_modsParam.bEnabled[key] = true;
+				if (!parameter.IsToggle()) {
+					parameter.Enabled = true;
 				}
 			}
 		}
 	}
 
 	private void SetExternalSaveData() {
-		foreach (var key in _modsParam.sKey) {
-			SetExternalSaveData(key);
+		foreach (var parameter in _modParameters.Parameters) {
+			SetExternalSaveData(parameter.Name);
 		}
 	}
 
 	private void SetExternalSaveData(string key) {
-		if (_modsParam.IsToggle(key)) {
-			ExSaveData.SetBool(_currentMaid, MaidVoicePitchPluginId, key, _modsParam.bEnabled[key]);
+		var parameter = _modParameters.GetParameter(key);
+
+		if (parameter.IsToggle()) {
+			ExSaveData.SetBool(_currentMaid, MaidVoicePitchPluginId, parameter.Name, parameter.Enabled);
 		}
 
-		if (_modsParam.IsSlider(key)) {
-			foreach (var prop in _modsParam.sPropName[key]) {
-				SetExternalSaveData(key, prop);
+		if (parameter.IsSlider()) {
+			foreach (var prop in parameter.PropertyNames) {
+				SetExternalSaveData(parameter.Name, prop);
 			}
 		}
 	}
 
 	private void SetExternalSaveData(string key, string prop) {
-		var value = (float)Math.Round(_modsParam.fValue[key][prop], 3, MidpointRounding.AwayFromZero);
+		var property = _modParameters.GetParameter(key).Properties[prop];
+		var value = (float)Math.Round(property.Value, 3, MidpointRounding.AwayFromZero);
 
 		ExSaveData.SetFloat(_currentMaid, MaidVoicePitchPluginId, prop, value);
 	}
@@ -1211,4 +1202,55 @@ public class AddModsSlider : BaseUnityPlugin {
 		ExternalModParameters.Add(modsParam);
 	}
 	#endregion
+
+	class ModControl {
+		public Transform ModUnit { get; internal set; }
+		public Dictionary<string, UILabel> Labels { get; set; } = new();
+		public ModParameters.Parameter Parameter { get; internal set; }
+
+		public float CodecSliderValue(string prop) {
+			var property = Parameter.Properties[prop];
+			var value = property.Value;
+			var minValue = property.MinValue;
+			var maxValue = property.MaxValue;
+			var propertyType = property.Type;
+
+			Math.Max(value, minValue);
+			Math.Min(value, maxValue);
+
+			if (propertyType == "scale" && minValue < 1f) {
+				Math.Max(minValue, 0f);
+				Math.Max(value, 0f);
+
+				return (value < 1f) ? (value - minValue) / (1f - minValue) * 0.5f : 0.5f + (value - 1f) / (maxValue - 1f) * 0.5f;
+			} else if (propertyType == "int") {
+				var minValueDecimal = (decimal)minValue;
+
+				return (float)Math.Round(((decimal)value - minValueDecimal) / ((decimal)maxValue - minValueDecimal), 1, MidpointRounding.AwayFromZero);
+			} else {
+				return (value - minValue) / (maxValue - minValue);
+			}
+		}
+
+		public float CodecSliderValue(string prop, float value) {
+			var property = Parameter.Properties[prop];
+			var minValue = property.MinValue;
+			var maxValue = property.MaxValue;
+			var propertyType = property.Type;
+
+			Math.Max(value, 0f);
+			Math.Min(value, 1f);
+
+			if (propertyType == "scale" && minValue < 1f) {
+				Math.Max(minValue, 0f);
+				Math.Max(value, 0f);
+
+				return (value < 0.5f) ? minValue + (1f - minValue) * value * 2f : 1 + (maxValue - 1f) * (value - 0.5f) * 2;
+			} else if (propertyType == "int") {
+				return (float)Math.Round(minValue + (maxValue - minValue) * value, 0, MidpointRounding.AwayFromZero);
+			} else {
+				return minValue + (maxValue - minValue) * value;
+			}
+		}
+	}
 }

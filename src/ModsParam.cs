@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Xml;
@@ -7,62 +6,56 @@ using UnityEngine;
 
 namespace CM3D2.AddModsSlider.Plugin;
 
-internal class ModsParam {
+internal class ModParameters {
 	private readonly string LogLabel = AddModsSlider.PluginName + " : ";
 
 	public readonly string DefMatchPattern = @"([-+]?[0-9]*\.?[0-9]+)";
 	public readonly string XmlFileName = Path.Combine(Paths.ConfigPath, "ModsParam.xml");
 
+	private readonly Dictionary<string, Parameter> _parametersDictionary = new();
 
-	public string XmlFormat;
-	public List<string> sKey = new();
+	public ModParameters() { }
 
-	public Dictionary<string, bool> bEnabled = new();
-	public Dictionary<string, string> sDescription = new();
-	public Dictionary<string, string> sType = new();
-	public Dictionary<string, bool> bOnWideSlider = new();
-	public Dictionary<string, bool> bVisible = new();
-
-	public Dictionary<string, string[]> sPropName = new();
-	public Dictionary<string, Dictionary<string, float>> fValue = new();
-	public Dictionary<string, Dictionary<string, float>> fVmin = new();
-	public Dictionary<string, Dictionary<string, float>> fVmax = new();
-	public Dictionary<string, Dictionary<string, float>> fVdef = new();
-	public Dictionary<string, Dictionary<string, string>> sVType = new();
-	public Dictionary<string, Dictionary<string, string>> sLabel = new();
-	public Dictionary<string, Dictionary<string, string>> sMatchPattern = new();
-	public Dictionary<string, Dictionary<string, bool>> bVVisible = new();
-
-	//--------
-
-	public ModsParam() { }
+	public List<Parameter> Parameters { get; } = new();
 
 	public bool Init() {
 		if (!LoadModParameters()) {
 			Debug.LogError(LogLabel + "LoadModParameters() failed.");
 			return false;
 		}
+
 		ApplyExternalModParameters();
-		foreach (var key in sKey) {
-			CheckWideSlider(key);
+
+		foreach (var key in Parameters) {
+			key.CheckWideSlider();
 		}
 
 		return true;
 	}
 
-	public bool CheckWideSlider(string key) {
-		return !bOnWideSlider[key] || (sKey.Contains("WIDESLIDER") && bEnabled["WIDESLIDER"]);
+	private Parameter AddParameter(string name, string insertBeforeName = null) {
+		var parameter = new Parameter(this, name);
+		if (!string.IsNullOrEmpty(insertBeforeName) && _parametersDictionary.TryGetValue(insertBeforeName, out var insertBeforeParameter)) {
+			Parameters.Insert(Parameters.IndexOf(insertBeforeParameter), parameter);
+		} else {
+			Parameters.Add(parameter);
+		}
+		_parametersDictionary[name] = parameter;
+		return parameter;
 	}
 
-	public bool IsToggle(string key) {
-		return sType[key].Contains("toggle");
+	public bool HasParameter(string name) => _parametersDictionary.ContainsKey(name);
+
+	private void RemoveParameter(Parameter parameter) {
+		Parameters.Remove(parameter);
+		_parametersDictionary.Remove(parameter.Name);
 	}
 
-	public bool IsSlider(string key) {
-		return sType[key].Contains("slider");
-	}
+	public bool TryGetParameter(string name, out Parameter parameter) => _parametersDictionary.TryGetValue(name, out parameter);
+	
+	public Parameter GetParameter(string name) => _parametersDictionary[name];
 
-	//--------
+	public bool WideSliderIsEnabled() => TryGetParameter("WIDESLIDER", out var wideSlider) && wideSlider.Enabled;
 
 	private bool LoadModParameters() {
 		if (!File.Exists(XmlFileName)) {
@@ -74,87 +67,77 @@ internal class ModsParam {
 		doc.Load(XmlFileName);
 
 		var mods = (XmlNode)doc.DocumentElement;
-		XmlFormat = ((XmlElement)mods).GetAttribute("format");
-		if (XmlFormat != "1.2" && XmlFormat != "1.21") {
+
+		var xmlFormat = ((XmlElement)mods).GetAttribute("format");
+		if (xmlFormat != "1.2" && xmlFormat != "1.21") {
 			Debug.LogError($"{LogLabel}{AddModsSlider.Version} requires format=\"1.2\" or \"1.21\" of ModsParam.xml.");
 			return false;
 		}
 
 		var modNodes = mods.SelectNodes("/mods/mod");
-		if (!(modNodes.Count > 0)) {
+		if (modNodes.Count == 0) {
 			Debug.LogError($"{LogLabel} \"{XmlFileName}\" has no <mod>elements.");
 			return false;
 		}
 
-		sKey.Clear();
+		Parameters.Clear();
+		_parametersDictionary.Clear();
 
 		foreach (XmlElement modNode in modNodes) {
-			// mod属性
 			var key = modNode.GetAttribute("id");
-			if (key != "" && !sKey.Contains(key)) {
-				sKey.Add(key);
-			} else {
+
+			if (key == "" || HasParameter(key)) {
 				continue;
 			}
 
-			var b = false;
-			bEnabled[key] = false;
-			sDescription[key] = modNode.GetAttribute("description");
-			bOnWideSlider[key] = bool.TryParse(modNode.GetAttribute("on_wideslider"), out b) ? b : false;
-			bVisible[key] = bool.TryParse(modNode.GetAttribute("visible"), out b) ? b : true;
+			var parameter = AddParameter(key);
+			parameter.Enabled = false;
+			parameter.Description = modNode.GetAttribute("description");
+			parameter.OnWideSlider = bool.TryParse(modNode.GetAttribute("on_wideslider"), out var onWideSlider) ? onWideSlider : false;
+			parameter.Visible = bool.TryParse(modNode.GetAttribute("visible"), out var visible) ? visible : true;
 
-			sType[key] = modNode.GetAttribute("type");
-			switch (sType[key]) {
-				case "toggle": break;
-				case "toggle,slider": break;
-				default: sType[key] = "slider"; break;
-			}
+			var type = modNode.GetAttribute("type");
 
-			if (!IsSlider(key)) {
+			parameter.Type = type switch {
+				"toggle" => type,
+				"toggle,slider" => type,
+				_ => "slider",
+			};
+
+			if (!parameter.IsSlider()) {
 				continue;
 			}
 
 			var valueNodes = modNode.GetElementsByTagName("value");
-			if (!(valueNodes.Count > 0)) {
+			if (valueNodes.Count == 0) {
 				continue;
 			}
 
-			sPropName[key] = new string[valueNodes.Count];
-			fValue[key] = new();
-			fVmin[key] = new();
-			fVmax[key] = new();
-			fVdef[key] = new();
-			sVType[key] = new();
-			sLabel[key] = new();
-			sMatchPattern[key] = new();
-			bVVisible[key] = new();
-
-			// value属性
-			var j = 0;
 			foreach (XmlElement valueNode in valueNodes) {
-				var x = 0f;
+				var propName = valueNode.GetAttribute("prop_name");
 
-				string prop = valueNode.GetAttribute("prop_name");
-				if (prop != "" && Array.IndexOf(sPropName[key], prop) < 0) {
-					sPropName[key][j] = prop;
-				} else {
-					sKey.Remove(key);
+				if (propName == "" || parameter.HasProperty(propName)) {
+					RemoveParameter(parameter);
 					break;
 				}
 
-				sVType[key][prop] = valueNode.GetAttribute("type");
-				switch (sVType[key][prop]) {
-					case "num": break;
-					case "scale": break;
-					case "int": break;
-					default: sVType[key][prop] = "num"; break;
-				}
+				var property = parameter.AddProperty(propName);
 
-				fVmin[key][prop] = float.TryParse(valueNode.GetAttribute("min"), out x) ? x : 0f;
-				fVmax[key][prop] = float.TryParse(valueNode.GetAttribute("max"), out x) ? x : 0f;
-				fVdef[key][prop] = float.TryParse(valueNode.GetAttribute("default"), out x) ? x : float.NaN;
-				if (float.IsNaN(fVdef[key][prop])) {
-					fVdef[key][prop] = sVType[key][prop] switch {
+				var propertyType = valueNode.GetAttribute("type");
+				property.Type = propertyType switch {
+					"num" => propertyType,
+					"scale" => propertyType,
+					"int" => propertyType,
+					_ => "num",
+				};
+
+				property.MinValue = float.TryParse(valueNode.GetAttribute("min"), out var minValue) ? minValue : 0f;
+				property.MaxValue = float.TryParse(valueNode.GetAttribute("max"), out var maxValue) ? maxValue : 0f;
+
+				var defaultValue = float.TryParse(valueNode.GetAttribute("default"), out var @default) ? @default : float.NaN;
+
+				if (float.IsNaN(defaultValue)) {
+					defaultValue = property.Type switch {
 						"num" => 0f,
 						"scale" => 1f,
 						"int" => 0f,
@@ -162,16 +145,15 @@ internal class ModsParam {
 					};
 				}
 
-				fValue[key][prop] = fVdef[key][prop];
-
-				sLabel[key][prop] = valueNode.GetAttribute("label");
-				sMatchPattern[key][prop] = valueNode.GetAttribute("match_pattern");
-				bVVisible[key][prop] = bool.TryParse(valueNode.GetAttribute("visible"), out b) ? b : true;
-
-				j++;
+				property.DefaultValue = defaultValue;
+				property.Value = property.DefaultValue;
+				property.Label = valueNode.GetAttribute("label");
+				property.MatchPattern = valueNode.GetAttribute("match_pattern");
+				property.Visible = bool.TryParse(valueNode.GetAttribute("visible"), out var b) ? b : true;
 			}
-			if (j == 0) {
-				sKey.Remove(key);
+
+			if (parameter.PropertyNames.Count == 0) {
+				RemoveParameter(parameter);
 			}
 		}
 
@@ -181,56 +163,106 @@ internal class ModsParam {
 	private void ApplyExternalModParameters() {
 		foreach (var modsParam in AddModsSlider.ExternalModParameters) {
 			var key = modsParam.sKey;
-			if (string.IsNullOrEmpty(key) || sKey.Contains(key)) {
+
+			if (string.IsNullOrEmpty(key) || HasParameter(key)) {
 				return;
 			}
 
-			if (!string.IsNullOrEmpty(modsParam.sInsertID) && sKey.Contains(modsParam.sInsertID)) {
-				sKey.Insert(sKey.IndexOf(modsParam.sInsertID), modsParam.sKey);
-			} else {
-				sKey.Add(key);
-			}
-			bEnabled[key] = false;
-			sDescription[key] = modsParam.sDescription;
-			bOnWideSlider[key] = modsParam.bOnWideSlider;
-			sType[key] = modsParam.sType;
-			bVisible[key] = true;
+			var parameter = AddParameter(key, modsParam.sInsertID);
+			parameter.Enabled = false;
+			parameter.Description = modsParam.sDescription;
+			parameter.OnWideSlider = modsParam.bOnWideSlider;
+			parameter.Type = modsParam.sType;
+			parameter.Visible = true;
 
-			if (!IsSlider(key)) {
+			if (!parameter.IsSlider()) {
 				continue;
 			}
 
 			if (modsParam.lValueList == null || modsParam.lValueList.Count == 0) {
-				sKey.Remove(key);
+				RemoveParameter(parameter);
 				continue;
 			}
-			sPropName[key] = new string[modsParam.lValueList.Count];
-			fValue[key] = new();
-			fVmin[key] = new();
-			fVmax[key] = new();
-			fVdef[key] = new();
-			sVType[key] = new();
-			sLabel[key] = new();
-			bVVisible[key] = new();
 
-			var i = 0;
 			foreach (var modsParamValue in modsParam.lValueList) {
-				var prop = modsParamValue.sPropName;
-				if (string.IsNullOrEmpty(prop) || Array.IndexOf(sPropName[key], prop) >= 0) {
-					sKey.Remove(key);
+				var propName = modsParamValue.sPropName;
+
+				if (string.IsNullOrEmpty(propName) || parameter.HasProperty(propName)) {
+					RemoveParameter(parameter);
 					break;
 				}
 
-				sPropName[key][i] = prop;
-				i++;
-				sVType[key][prop] = modsParamValue.sType;
-				fVmin[key][prop] = modsParamValue.fMin;
-				fVmax[key][prop] = modsParamValue.fMax;
-				fVdef[key][prop] = modsParamValue.fDef;
-				fValue[key][prop] = modsParamValue.fDef;
-				sLabel[key][prop] = modsParamValue.sLabel;
-				bVVisible[key][prop] = true;
+				var property = parameter.AddProperty(propName);
+				property.Type = modsParamValue.sType;
+				property.MinValue = modsParamValue.fMin;
+				property.MaxValue = modsParamValue.fMax;
+				property.DefaultValue = modsParamValue.fDef;
+				property.Value = modsParamValue.fDef;
+				property.Label = modsParamValue.sLabel;
+				property.Visible = true;
 			}
+		}
+	}
+
+	internal class Parameter {
+		private readonly ModParameters _modParameters;
+
+		public Parameter(ModParameters modParameters, string name) {
+			_modParameters = modParameters;
+			Name = name;
+		}
+
+		public string Name { get; }
+		public string Type { get; set; }
+		public string Description { get; set; }
+		public bool Enabled { get; set; }
+		public bool Visible { get; set; }
+		public bool OnWideSlider { get; set; }
+		public bool WasEnabled { get; set; }
+		public List<string> PropertyNames { get; } = new();
+		public Dictionary<string, Property> Properties { get; } = new();
+
+		public Property AddProperty(string name) {
+			var property = new Property();
+			PropertyNames.Add(name);
+			Properties.Add(name, property);
+			return property;
+		}
+
+		public void SetPropertyValue(string name, float value, bool setPrevious = false) {
+			var property = Properties[name];
+			property.Value = value;
+			if (setPrevious) {
+				property.PreviousValue = value;
+			}
+		}
+
+		public void UndoPropertyValue(string name) => Properties[name].UndoValue();
+
+		public void ResetPropertyValue(string name) => Properties[name].ResetValue();
+
+		public bool HasProperty(string name) => Properties.ContainsKey(name);
+
+		internal bool IsToggle() => Type.Contains("toggle");
+
+		internal bool IsSlider() => Type.Contains("slider");
+
+		public bool CheckWideSlider() => !OnWideSlider || _modParameters.WideSliderIsEnabled();
+
+		public class Property {
+			public string Type { get; set; }
+			public string Label { get; set; }
+			public float Value { get; set; }
+			public float MinValue { get; set; }
+			public float MaxValue { get; set; }
+			public float DefaultValue { get; set; }
+			public bool Visible { get; set; }
+			public string MatchPattern { get; set; }
+			public float PreviousValue { get; set; }
+
+			public void UndoValue() => Value = PreviousValue;
+
+			public void ResetValue() => Value = DefaultValue;
 		}
 	}
 }
