@@ -2,18 +2,13 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Xml;
 using System.Linq;
+using System.Xml;
+using BepInEx;
+using CM3D2.ExternalPreset.Managed;
+using CM3D2.ExternalSaveData.Managed;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using BepInEx;
-using I2.Loc;
-
-using CM3D2.ExternalSaveData.Managed;
-using CM3D2.ExternalPreset.Managed;
 
 namespace CM3D2.AddModsSlider.Plugin;
 
@@ -26,7 +21,7 @@ public class AddModsSlider : BaseUnityPlugin {
 	public const string PluginName = "AddModsSlider";
 	public const string Version = "0.1.3.6";
 
-	private readonly string LogLabel = AddModsSlider.PluginName + " : ";
+	private readonly string LogLabel = PluginName + " : ";
 
 	private readonly float TimePerInit = 0.10f;
 
@@ -69,7 +64,7 @@ public class AddModsSlider : BaseUnityPlugin {
 	#region Nested classes
 
 	private class ModsParam {
-		private readonly string LogLabel = AddModsSlider.PluginName + " : ";
+		private readonly string LogLabel = PluginName + " : ";
 
 		public readonly string DefMatchPattern = @"([-+]?[0-9]*\.?[0-9]+)";
 		public readonly string XmlFileName = Path.Combine(Paths.ConfigPath, "ModsParam.xml");
@@ -119,11 +114,11 @@ public class AddModsSlider : BaseUnityPlugin {
 		}
 
 		public bool IsToggle(string key) {
-			return (sType[key].Contains("toggle")) ? true : false;
+			return sType[key].Contains("toggle");
 		}
 
 		public bool IsSlider(string key) {
-			return (sType[key].Contains("slider")) ? true : false;
+			return sType[key].Contains("slider");
 		}
 
 		//--------
@@ -140,7 +135,7 @@ public class AddModsSlider : BaseUnityPlugin {
 			var mods = (XmlNode)doc.DocumentElement;
 			XmlFormat = ((XmlElement)mods).GetAttribute("format");
 			if (XmlFormat != "1.2" && XmlFormat != "1.21") {
-				Debug.LogError($"{LogLabel}{AddModsSlider.Version} requires fomart=\"1.2\" or \"1.21\" of ModsParam.xml.");
+				Debug.LogError($"{LogLabel}{Version} requires fomart=\"1.2\" or \"1.21\" of ModsParam.xml.");
 				return false;
 			}
 
@@ -164,8 +159,8 @@ public class AddModsSlider : BaseUnityPlugin {
 				var b = false;
 				bEnabled[key] = false;
 				sDescription[key] = ((XmlElement)modNode).GetAttribute("description");
-				bOnWideSlider[key] = (bool.TryParse(((XmlElement)modNode).GetAttribute("on_wideslider"), out b)) ? b : false;
-				bVisible[key] = (bool.TryParse(((XmlElement)modNode).GetAttribute("visible"), out b)) ? b : true;
+				bOnWideSlider[key] = bool.TryParse(((XmlElement)modNode).GetAttribute("on_wideslider"), out b) ? b : false;
+				bVisible[key] = bool.TryParse(((XmlElement)modNode).GetAttribute("visible"), out b) ? b : true;
 
 				sType[key] = ((XmlElement)modNode).GetAttribute("type");
 				switch (sType[key]) {
@@ -230,7 +225,7 @@ public class AddModsSlider : BaseUnityPlugin {
 
 					sLabel[key][prop] = ((XmlElement)valueNode).GetAttribute("label");
 					sMatchPattern[key][prop] = ((XmlElement)valueNode).GetAttribute("match_pattern");
-					bVVisible[key][prop] = (bool.TryParse(((XmlElement)valueNode).GetAttribute("visible"), out b)) ? b : true;
+					bVVisible[key][prop] = bool.TryParse(((XmlElement)valueNode).GetAttribute("visible"), out b) ? b : true;
 
 					j++;
 				}
@@ -393,7 +388,7 @@ public class AddModsSlider : BaseUnityPlugin {
 
 			if (mp.IsSlider(key)) {
 				if (!mp.IsToggle(key)) {
-					b = !(UIButton.current.defaultColor.a == 1f);
+					b = UIButton.current.defaultColor.a != 1f;
 				}
 
 				setSliderVisible(key, b);
@@ -410,7 +405,7 @@ public class AddModsSlider : BaseUnityPlugin {
 		try {
 			foreach (var key in mp.sKey) {
 				if (mp.IsToggle(key)) {
-					mp.bEnabled[key] = (undoValue[key]["enable"] == 1f);
+					mp.bEnabled[key] = undoValue[key]["enable"] == 1f;
 					setExSaveData(key);
 					notifyMaidVoicePitchOnChange();
 					setButtonColor(key, mp.bEnabled[key]);
@@ -633,7 +628,7 @@ public class AddModsSlider : BaseUnityPlugin {
 
 
 			// ボタンはgoProfileTabをコピー
-			var goProfileTabCopy = UnityEngine.Object.Instantiate(FindChild(goUIRoot.transform.Find("ProfilePanel").Find("Comment").gameObject, "ProfileTab"));
+			var goProfileTabCopy = Instantiate(FindChild(goUIRoot.transform.Find("ProfilePanel").Find("Comment").gameObject, "ProfileTab"));
 			EventDelegate.Remove(goProfileTabCopy.GetComponent<UIButton>().onClick, new EventDelegate.Callback(ProfileMgr.Instance.ChangeCommentTab));
 			goProfileTabCopy.SetActive(false);
 
@@ -712,7 +707,7 @@ public class AddModsSlider : BaseUnityPlugin {
 			uiTable.hideInactive = true;
 			uiTable.keepWithinPanel = true;
 			uiTable.sorting = UITable.Sorting.Custom;
-			uiTable.onCustomSort = (Comparison<Transform>)this.sortGridByXMLOrder;
+			uiTable.onCustomSort = sortGridByXMLOrder;
 			//uiTable.onReposition    = this.OnRepositionTable;
 			goScrollViewTable = uiTable.gameObject;
 			//uiScrollView.centerOnChild = goScrollViewTable.AddComponent<UICenterOnChild>();
@@ -745,13 +740,13 @@ public class AddModsSlider : BaseUnityPlugin {
 			uiLabelTitleTab.color = Color.white;
 			uiLabelTitleTab.trueTypeFont = font;
 			uiLabelTitleTab.fontSize = 18;
-			uiLabelTitleTab.text = "Mods Slider " + AddModsSlider.Version;
+			uiLabelTitleTab.text = "Mods Slider " + Version;
 
 			int conWidth = (int)(uiBGSprite.width - uiTable.padding.x * 2);
 			int baseTop = (int)(uiBGSprite.height / 2f - 50);
 
 			var goSystemUnit = NGUITools.AddChild(goAMSPanel);
-			goSystemUnit.name = ("System:Undo");
+			goSystemUnit.name = "System:Undo";
 
 			// Undoボタン
 			var goUndoAll = SetCloneChild(goSystemUnit, goProfileTabCopy, "UndoAll");
@@ -777,7 +772,7 @@ public class AddModsSlider : BaseUnityPlugin {
 
 			var uiButtonUndoAll = goUndoAll.GetComponent<UIButton>();
 			uiButtonUndoAll.defaultColor = new(1f, 1f, 1f, 0.8f);
-			EventDelegate.Set(uiButtonUndoAll.onClick, new EventDelegate.Callback(this.OnClickUndoAll));
+			EventDelegate.Set(uiButtonUndoAll.onClick, new EventDelegate.Callback(OnClickUndoAll));
 
 			FindChild(goUndoAll, "SelectCursor").GetComponent<UISprite>().SetDimensions(16, 16);
 			FindChild(goUndoAll, "SelectCursor").SetActive(false);
@@ -793,7 +788,7 @@ public class AddModsSlider : BaseUnityPlugin {
 
 			var uiButtonResetAll = goResetAll.GetComponent<UIButton>();
 			uiButtonResetAll.defaultColor = new(1f, 1f, 1f, 0.8f);
-			EventDelegate.Set(uiButtonResetAll.onClick, new EventDelegate.Callback(this.OnClickResetAll));
+			EventDelegate.Set(uiButtonResetAll.onClick, new EventDelegate.Callback(OnClickResetAll));
 
 			NGUITools.UpdateWidgetCollider(goResetAll);
 			goResetAll.SetActive(true);
@@ -823,7 +818,7 @@ public class AddModsSlider : BaseUnityPlugin {
 
 				// ModUnit：modタグ単位のまとめオブジェクト ScrollViewGridの子
 				var goModUnit = NGUITools.AddChild(goScrollViewTable);
-				goModUnit.name = ("Unit:" + key);
+				goModUnit.name = "Unit:" + key;
 				trModUnit[key] = goModUnit.transform;
 
 				// プロフィールタブ複製・追加
@@ -831,8 +826,8 @@ public class AddModsSlider : BaseUnityPlugin {
 				goHeaderButton.SetActive(true);
 				goHeaderButton.AddComponent<UIDragScrollView>().scrollView = uiScrollView;
 				var uiHeaderButton = goHeaderButton.GetComponent<UIButton>();
-				EventDelegate.Set(uiHeaderButton.onClick, new EventDelegate.Callback(this.OnClickHeaderButton));
-				setButtonColor(uiHeaderButton, mp.IsToggle(key) ? mp.bEnabled[key] : false);
+				EventDelegate.Set(uiHeaderButton.onClick, new EventDelegate.Callback(OnClickHeaderButton));
+				setButtonColor(uiHeaderButton, mp.IsToggle(key) && mp.bEnabled[key]);
 
 				// 白地Sprite
 				var uiSpriteHeaderButton = goHeaderButton.GetComponent<UISprite>();
@@ -853,7 +848,7 @@ public class AddModsSlider : BaseUnityPlugin {
 
 				// 金枠Sprite
 				var uiSpriteHeaderCursor = FindChild(goHeaderButton, "SelectCursor").GetComponent<UISprite>();
-				uiSpriteHeaderCursor.gameObject.SetActive(mp.IsToggle(key) ? mp.bEnabled[key] : false);
+				uiSpriteHeaderCursor.gameObject.SetActive(mp.IsToggle(key) && mp.bEnabled[key]);
 
 				NGUITools.UpdateWidgetCollider(goHeaderButton);
 
@@ -888,7 +883,7 @@ public class AddModsSlider : BaseUnityPlugin {
 					var uiButtonUndo = goUndo.GetComponent<UIButton>();
 					uiButtonUndo.defaultColor = new(1f, 1f, 1f, 0.8f);
 
-					EventDelegate.Set(uiButtonUndo.onClick, new EventDelegate.Callback(this.OnClickUndoButton));
+					EventDelegate.Set(uiButtonUndo.onClick, new EventDelegate.Callback(OnClickUndoButton));
 					FindChild(goUndo, "SelectCursor").GetComponent<UISprite>().SetDimensions(16, 16);
 					FindChild(goUndo, "SelectCursor").SetActive(false);
 					NGUITools.UpdateWidgetCollider(goUndo);
@@ -919,7 +914,7 @@ public class AddModsSlider : BaseUnityPlugin {
 					var uiButtonReset = goReset.GetComponent<UIButton>();
 					uiButtonReset.defaultColor = new(1f, 1f, 1f, 0.8f);
 
-					EventDelegate.Set(uiButtonReset.onClick, new EventDelegate.Callback(this.OnClickResetButton));
+					EventDelegate.Set(uiButtonReset.onClick, new EventDelegate.Callback(OnClickResetButton));
 					FindChild(goReset, "SelectCursor").GetComponent<UISprite>().SetDimensions(16, 16);
 					FindChild(goReset, "SelectCursor").SetActive(false);
 					NGUITools.UpdateWidgetCollider(goReset);
@@ -952,7 +947,7 @@ public class AddModsSlider : BaseUnityPlugin {
 						uiModSlider.name = $"Slider:{key}:{prop}";
 						uiModSlider.value = codecSliderValue(key, prop);
 						if (vType == "int") uiModSlider.numberOfSteps = (int)(vmax - vmin + 1);
-						EventDelegate.Add(uiModSlider.onChange, new EventDelegate.Callback(this.OnChangeSlider));
+						EventDelegate.Add(uiModSlider.onChange, new EventDelegate.Callback(OnChangeSlider));
 
 						// スライダーラベル設定
 						FindChild(goSliderUnit, "Label").GetComponent<UILabel>().text = label;
@@ -963,7 +958,7 @@ public class AddModsSlider : BaseUnityPlugin {
 						goValueLabel.name = $"Value:{key}:{prop}";
 						uiValueLable[key][prop] = goValueLabel.GetComponent<UILabel>();
 						uiValueLable[key][prop].multiLine = false;
-						EventDelegate.Set(goValueLabel.GetComponent<UIInput>().onSubmit, this.OnSubmitSliderValueInput);
+						EventDelegate.Set(goValueLabel.GetComponent<UIInput>().onSubmit, OnSubmitSliderValueInput);
 
 						// スライダー有効状態設定
 						//goSliderUnit.SetActive( !mp.IsToggle(key) || mp.bEnabled[key] && mp.CheckWS(key) );
@@ -1205,7 +1200,7 @@ public class AddModsSlider : BaseUnityPlugin {
 	//--------
 
 	private void notifyMaidVoicePitchOnChange() {
-		this.gameObject.SendMessage("MaidVoicePitch_UpdateSliders");
+		gameObject.SendMessage("MaidVoicePitch_UpdateSliders");
 	}
 
 	public void syncExSaveDatatoSlider() {
@@ -1249,7 +1244,7 @@ public class AddModsSlider : BaseUnityPlugin {
 
 			if (mp.IsToggle(key)) {
 				mp.bEnabled[key] = ExSaveData.GetBool(maid, plugin, key, false);
-				undoValue[key]["enable"] = (mp.bEnabled[key]) ? 1f : 0f;
+				undoValue[key]["enable"] = mp.bEnabled[key] ? 1f : 0f;
 				Debug.Log($"{key,-32} = {mp.bEnabled[key],-16}");
 			}
 
@@ -1373,7 +1368,7 @@ public class AddModsSlider : BaseUnityPlugin {
 	}
 
 	internal static GameObject SetCloneChild(GameObject parent, GameObject orignal, string name) {
-		var clone = UnityEngine.Object.Instantiate(orignal);
+		var clone = Instantiate(orignal);
 		if (!clone) {
 			return null;
 		}
@@ -1393,12 +1388,12 @@ public class AddModsSlider : BaseUnityPlugin {
 		var child = FindChild(parent, name);
 		if (child) {
 			child.transform.parent = null;
-			GameObject.Destroy(child);
+			Destroy(child);
 		}
 	}
 
 	internal static UIAtlas FindAtlas(string s) {
-		return ((new List<UIAtlas>(Resources.FindObjectsOfTypeAll<UIAtlas>())).FirstOrDefault(a => a.name == s));
+		return new List<UIAtlas>(Resources.FindObjectsOfTypeAll<UIAtlas>()).FirstOrDefault(a => a.name == s);
 	}
 
 	internal static void WriteTrans(string s) {
