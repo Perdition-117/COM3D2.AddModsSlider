@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using BepInEx;
+using BepInEx.Logging;
 using CM3D2.ExternalPreset.Managed;
 using CM3D2.ExternalSaveData.Managed;
 using UnityEngine;
@@ -12,7 +13,7 @@ using UnityEngine.SceneManagement;
 namespace CM3D2.AddModsSlider.Plugin;
 
 //[PluginFilter("CM3D2x64"), PluginFilter("CM3D2x86"), PluginFilter("CM3D2VRx64")]
-[BepInPlugin("CM3D2.AddModsSlider", "CM3D2 AddModsSlider", "0.1.3.6")]
+[BepInPlugin("CM3D2.AddModsSlider", "AddModsSlider", "0.1.3.6")]
 public class AddModsSlider : BaseUnityPlugin {
 
 	#region Constants
@@ -21,8 +22,6 @@ public class AddModsSlider : BaseUnityPlugin {
 	public const string Version = "0.1.3.6";
 
 	private const string MaidVoicePitchPluginId = "CM3D2.MaidVoicePitch";
-
-	private const string LogLabel = PluginName + " : ";
 
 	private const float TimePerInit = 0.10f;
 
@@ -35,6 +34,8 @@ public class AddModsSlider : BaseUnityPlugin {
 
 
 	#region Variables
+
+	private static ManualLogSource _logger;
 
 	private bool _xmlLoad = false;
 	private bool _isVisible = false;
@@ -103,6 +104,19 @@ public class AddModsSlider : BaseUnityPlugin {
 
 
 	#region MonoBehaviour methods
+
+	private void Awake() {
+		_logger = Logger;
+	}
+
+	internal static void LogDebug(object data) {
+		_logger.LogDebug(data);
+	}
+
+	internal static void LogError(object data) {
+		_logger.LogError(data);
+	}
+
 	private void Start() {
 		SceneManager.sceneLoaded += OnSceneLoaded;
 
@@ -137,64 +151,54 @@ public class AddModsSlider : BaseUnityPlugin {
 	#region Callbacks
 
 	public void OnClickHeaderButton() {
-		try {
-			var key = GetTag(UIButton.current, 1);
-			var enabled = false;
+		var key = GetTag(UIButton.current, 1);
+		var enabled = false;
 
 			var parameter = _modParameters.GetParameter(key);
 
-			if (parameter.IsToggle()) {
-				enabled = !parameter.Enabled;
-				parameter.Enabled = enabled;
-				SetExternalSaveData(key);
+		if (parameter.IsToggle()) {
+			enabled = !parameter.Enabled;
+			parameter.Enabled = enabled;
+			SetExternalSaveData(key);
 
-				NotifyMaidVoicePitchOnChange();
+			NotifyMaidVoicePitchOnChange();
 
-				// WIDESLIDER有効化/無効化に合わせて、依存項目UIを表示/非表示
-				if (key == "WIDESLIDER") {
-					toggleActiveOnWideSlider();
-				}
+			// WIDESLIDER有効化/無効化に合わせて、依存項目UIを表示/非表示
+			if (key == "WIDESLIDER") {
+				toggleActiveOnWideSlider();
 			}
-
-			if (parameter.IsSlider()) {
-				if (!parameter.IsToggle()) {
-					enabled = UIButton.current.defaultColor.a != 1f;
-				}
-
-				SetSliderVisible(key, enabled);
-			}
-
-			SetButtonColor(UIButton.current, enabled);
-		} catch (Exception ex) {
-			Debug.Log($"{LogLabel}OnClickToggleHeader() {ex}");
-			return;
 		}
+
+		if (parameter.IsSlider()) {
+			if (!parameter.IsToggle()) {
+				enabled = UIButton.current.defaultColor.a != 1f;
+			}
+
+			SetSliderVisible(key, enabled);
+		}
+
+		SetButtonColor(UIButton.current, enabled);
 	}
 
 	public void OnClickUndoAll() {
-		try {
-			foreach (var parameter in _modParameters.Parameters) {
-				var key = parameter.Name;
+		foreach (var parameter in _modParameters.Parameters) {
+			var key = parameter.Name;
+
+			if (parameter.IsToggle()) {
+				parameter.Enabled = parameter.WasEnabled;
+				SetExternalSaveData(key);
+				NotifyMaidVoicePitchOnChange();
+				SetButtonColor(key, parameter.Enabled);
+			}
+
+			if (parameter.IsSlider()) {
+				UndoSliderValue(key);
+				SetExternalSaveData(key);
 
 				if (parameter.IsToggle()) {
-					parameter.Enabled = parameter.WasEnabled;
-					SetExternalSaveData(key);
-					NotifyMaidVoicePitchOnChange();
-					SetButtonColor(key, parameter.Enabled);
-				}
-
-				if (parameter.IsSlider()) {
-					UndoSliderValue(key);
-					SetExternalSaveData(key);
-
-					if (parameter.IsToggle()) {
-						SetSliderVisible(key, parameter.Enabled);
-					}
+					SetSliderVisible(key, parameter.Enabled);
 				}
 			}
-		} catch (Exception ex) {
-			Debug.Log($"{LogLabel}OnClickUndoAll() {ex}");
-			return;
 		}
 	}
 
@@ -205,29 +209,24 @@ public class AddModsSlider : BaseUnityPlugin {
 	}
 
 	public void OnClickResetAll() {
-		try {
-			foreach (var parameter in _modParameters.Parameters) {
-				var key = parameter.Name;
+		foreach (var parameter in _modParameters.Parameters) {
+			var key = parameter.Name;
+
+			if (parameter.IsToggle()) {
+				parameter.Enabled = false;
+				SetExternalSaveData(key);
+				NotifyMaidVoicePitchOnChange();
+				SetButtonColor(key, parameter.Enabled);
+			}
+
+			if (parameter.IsSlider()) {
+				ResetSliderValue(key);
+				SetExternalSaveData(key);
 
 				if (parameter.IsToggle()) {
-					parameter.Enabled = false;
-					SetExternalSaveData(key);
-					NotifyMaidVoicePitchOnChange();
-					SetButtonColor(key, parameter.Enabled);
-				}
-
-				if (parameter.IsSlider()) {
-					ResetSliderValue(key);
-					SetExternalSaveData(key);
-
-					if (parameter.IsToggle()) {
-						SetSliderVisible(key, parameter.Enabled);
-					}
+					SetSliderVisible(key, parameter.Enabled);
 				}
 			}
-		} catch (Exception ex) {
-			Debug.Log($"{LogLabel}OnClickResetAll() {ex}");
-			return;
 		}
 	}
 
@@ -238,57 +237,47 @@ public class AddModsSlider : BaseUnityPlugin {
 	}
 
 	public void OnChangeSlider() {
-		try {
-			var key = GetTag(UIProgressBar.current, 1);
-			var prop = GetTag(UIProgressBar.current, 2);
+		var key = GetTag(UIProgressBar.current, 1);
+		var prop = GetTag(UIProgressBar.current, 2);
 
-			var modControl = _modControlsDictionary[key];
+		var modControl = _modControlsDictionary[key];
 
-			var value = modControl.CodecSliderValue(prop, UIProgressBar.current.value);
+		var value = modControl.CodecSliderValue(prop, UIProgressBar.current.value);
 
-			modControl.Parameter.SetPropertyValue(prop, value);
+		modControl.Parameter.SetPropertyValue(prop, value);
 
-			var text = value.ToString("F2");
-			modControl.Labels[prop].text = text;
-			modControl.Labels[prop].gameObject.GetComponent<UIInput>().value = text;
+		var text = value.ToString("F2");
+		modControl.Labels[prop].text = text;
+		modControl.Labels[prop].gameObject.GetComponent<UIInput>().value = text;
 
-			SetExternalSaveData(key, prop);
+		SetExternalSaveData(key, prop);
 
-			NotifyMaidVoicePitchOnChange();
+		NotifyMaidVoicePitchOnChange();
 
-			//Debug.Log(key +":"+ prop +":"+ value);
-		} catch (Exception ex) {
-			Debug.Log($"{LogLabel}OnChangeSlider() {ex}");
-			return;
-		}
+		//Debug.Log(key +":"+ prop +":"+ value);
 	}
 
 	public void OnSubmitSliderValueInput() {
-		try {
-			var key = GetTag(UIInput.current, 1);
-			var prop = GetTag(UIInput.current, 2);
-			UISlider slider = null;
+		var key = GetTag(UIInput.current, 1);
+		var prop = GetTag(UIInput.current, 2);
+		UISlider slider = null;
 
-			foreach (Transform t in UIInput.current.transform.parent.parent) {
-				if (GetTag(t, 0) == "Slider") {
-					slider = t.GetComponent<UISlider>();
-				}
+		foreach (Transform t in UIInput.current.transform.parent.parent) {
+			if (GetTag(t, 0) == "Slider") {
+				slider = t.GetComponent<UISlider>();
 			}
+		}
 
-			var modControl = _modControlsDictionary[key];
+		var modControl = _modControlsDictionary[key];
 
-			if (float.TryParse(UIInput.current.value, out var value)) {
-				modControl.Parameter.SetPropertyValue(prop, value);
+		if (float.TryParse(UIInput.current.value, out var value)) {
+			modControl.Parameter.SetPropertyValue(prop, value);
 
-				slider.value = modControl.CodecSliderValue(prop);
+			slider.value = modControl.CodecSliderValue(prop);
 
-				var text = modControl.CodecSliderValue(prop, slider.value).ToString("F2");
-				UIInput.current.value = text;
-				modControl.Labels[prop].text = text;
-			}
-		} catch (Exception ex) {
-			Debug.Log($"{LogLabel}OnSubmitSliderValueInput() {ex}");
-			return;
+			var text = modControl.CodecSliderValue(prop, slider.value).ToString("F2");
+			UIInput.current.value = text;
+			modControl.Labels[prop].text = text;
 		}
 	}
 
@@ -302,7 +291,7 @@ public class AddModsSlider : BaseUnityPlugin {
 			yield return new WaitForSeconds(TimePerInit);
 		}
 
-		Debug.Log(LogLabel + "Initialization complete.");
+		Logger.LogDebug("Initialization complete.");
 	}
 
 	private bool Initialize() {
@@ -577,10 +566,8 @@ public class AddModsSlider : BaseUnityPlugin {
 
 
 			// 拡張セーブデータ読込
-			Debug.Log(LogLabel + "Loading ExternalSaveData...");
-			Debug.Log("----------------ExternalSaveData----------------");
+			Logger.LogDebug("Loading ExternalSaveData...");
 			GetExternalSaveData();
-			Debug.Log("------------------------------------------------");
 
 
 			#region addTableContents
@@ -765,7 +752,7 @@ public class AddModsSlider : BaseUnityPlugin {
 
 			//WriteTrans("UI Root");
 		} catch (Exception ex) {
-			Debug.Log($"{LogLabel}initialize() {ex}");
+			Logger.LogError($"{nameof(Initialize)}() {ex}");
 			return false;
 		}
 
@@ -822,43 +809,35 @@ public class AddModsSlider : BaseUnityPlugin {
 
 			_uiTable.repositionNow = true;
 		} catch (Exception ex) {
-			Debug.Log($"{LogLabel}toggleActiveOnWideSlider() {ex}");
+			Logger.LogError($"{nameof(toggleActiveOnWideSlider)}() {ex}");
 		}
 	}
 
 	private void UndoSliderValue(string key) {
-		try {
-			var modControl = _modControlsDictionary[key];
-			foreach (Transform transform in modControl.ModUnit) {
-				if (transform.name == "SliderUnit") {
-					var slider = FindChildByTag(transform, "Slider").GetComponent<UISlider>();
-					var prop = GetTag(slider, 2);
+		var modControl = _modControlsDictionary[key];
+		foreach (Transform transform in modControl.ModUnit) {
+			if (transform.name == "SliderUnit") {
+				var slider = FindChildByTag(transform, "Slider").GetComponent<UISlider>();
+				var prop = GetTag(slider, 2);
 
-					modControl.Parameter.UndoPropertyValue(prop);
+				modControl.Parameter.UndoPropertyValue(prop);
 
-					SetSliderValue(slider, modControl);
-				}
+				SetSliderValue(slider, modControl);
 			}
-		} catch (Exception ex) {
-			Debug.Log($"{LogLabel}UndoSliderValue() {ex}");
 		}
 	}
 
 	private void ResetSliderValue(string key) {
-		try {
-			var modControl = _modControlsDictionary[key];
-			foreach (Transform transform in modControl.ModUnit) {
-				if (transform.name == "SliderUnit") {
-					var slider = FindChildByTag(transform, "Slider").GetComponent<UISlider>();
-					var prop = GetTag(slider, 2);
+		var modControl = _modControlsDictionary[key];
+		foreach (Transform transform in modControl.ModUnit) {
+			if (transform.name == "SliderUnit") {
+				var slider = FindChildByTag(transform, "Slider").GetComponent<UISlider>();
+				var prop = GetTag(slider, 2);
 
-					modControl.Parameter.ResetPropertyValue(prop);
+				modControl.Parameter.ResetPropertyValue(prop);
 
-					SetSliderValue(slider, modControl);
-				}
+				SetSliderValue(slider, modControl);
 			}
-		} catch (Exception ex) {
-			Debug.Log($"{LogLabel}ResetSliderValue() {ex}");
 		}
 	}
 
@@ -915,7 +894,7 @@ public class AddModsSlider : BaseUnityPlugin {
 				return key1Pos - key2Pos;
 			}
 		} catch (Exception ex) {
-			Debug.Log($"{LogLabel}sortGridByXMLOrder() {ex}");
+			Logger.LogError($"{nameof(SortGrid)}() {ex}");
 			return 0;
 		}
 	}
@@ -963,10 +942,8 @@ public class AddModsSlider : BaseUnityPlugin {
 	}
 
 	public void syncExSaveDatatoSlider() {
-		Debug.Log(LogLabel + "Loading ExternalPresetData...");
-		Debug.Log("----------------ExternalPresetData----------------");
+		Logger.LogDebug("Loading ExternalPresetData...");
 		GetExternalSaveData();
-		Debug.Log("------------------------------------------------");
 		try {
 			foreach (var modControl in _modControls) {
 				var parameter = modControl.Parameter;
@@ -987,7 +964,7 @@ public class AddModsSlider : BaseUnityPlugin {
 				}
 			}
 		} catch (Exception ex) {
-			Debug.Log($"{LogLabel}syncExSaveDatatoSlider() {ex}");
+			Logger.LogError($"{nameof(syncExSaveDatatoSlider)}() {ex}");
 		}
 	}
 
@@ -997,7 +974,7 @@ public class AddModsSlider : BaseUnityPlugin {
 			if (parameter.IsToggle()) {
 				parameter.Enabled = ExSaveData.GetBool(_currentMaid, MaidVoicePitchPluginId, parameter.Name, false);
 				parameter.WasEnabled = parameter.Enabled;
-				Debug.Log($"{parameter.Name,-32} = {parameter.Enabled,-16}");
+				Logger.LogDebug($"{parameter.Name,-32} = {parameter.Enabled,5}");
 			}
 
 			if (parameter.IsSlider()) {
@@ -1007,7 +984,7 @@ public class AddModsSlider : BaseUnityPlugin {
 					property.Value = float.IsNaN(f) ? property.DefaultValue : f;
 					property.PreviousValue = property.Value;
 
-					Debug.Log($"{prop,-32} = {property.Value:f}");
+					Logger.LogDebug($"{prop,-32} = {property.Value:f}");
 				}
 				if (!parameter.IsToggle()) {
 					parameter.Enabled = true;
@@ -1191,7 +1168,7 @@ public class AddModsSlider : BaseUnityPlugin {
 
 	internal static void WriteComponent(GameObject gameObject) {
 		foreach (var component in gameObject.GetComponents<Component>()) {
-			Debug.Log($"{gameObject.name}:{component.GetType().Name}");
+			LogDebug($"{gameObject.name}:{component.GetType().Name}");
 		}
 	}
 

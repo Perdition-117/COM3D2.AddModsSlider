@@ -2,13 +2,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Xml;
 using BepInEx;
-using UnityEngine;
 
 namespace CM3D2.AddModsSlider.Plugin;
 
 internal class ModParameters {
-	private readonly string LogLabel = AddModsSlider.PluginName + " : ";
-
 	public readonly string DefMatchPattern = @"([-+]?[0-9]*\.?[0-9]+)";
 	public readonly string XmlFileName = Path.Combine(Paths.ConfigPath, "ModsParam.xml");
 
@@ -20,7 +17,7 @@ internal class ModParameters {
 
 	public bool Init() {
 		if (!LoadModParameters()) {
-			Debug.LogError(LogLabel + "LoadModParameters() failed.");
+			AddModsSlider.LogError("Failed to load mod parameters.");
 			return false;
 		}
 
@@ -59,7 +56,7 @@ internal class ModParameters {
 
 	private bool LoadModParameters() {
 		if (!File.Exists(XmlFileName)) {
-			Debug.LogError($"{LogLabel}\"{XmlFileName}\" does not exist.");
+			AddModsSlider.LogError($"\"{XmlFileName}\" does not exist.");
 			return false;
 		}
 
@@ -70,13 +67,13 @@ internal class ModParameters {
 
 		var xmlFormat = ((XmlElement)mods).GetAttribute("format");
 		if (xmlFormat != "1.2" && xmlFormat != "1.21") {
-			Debug.LogError($"{LogLabel}{AddModsSlider.Version} requires format=\"1.2\" or \"1.21\" of ModsParam.xml.");
+			AddModsSlider.LogError($"AddModsSlider v{AddModsSlider.Version} requires ModsParam.xml format=\"1.2\" or \"1.21\".");
 			return false;
 		}
 
 		var modNodes = mods.SelectNodes("/mods/mod");
 		if (modNodes.Count == 0) {
-			Debug.LogError($"{LogLabel} \"{XmlFileName}\" has no <mod>elements.");
+			AddModsSlider.LogError($"\"{XmlFileName}\" has no <mod> elements.");
 			return false;
 		}
 
