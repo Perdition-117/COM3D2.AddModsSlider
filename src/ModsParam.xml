@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!DOCTYPE mods [
+    <!ELEMENT mods (mod*)>
+    <!ATTLIST mods format         CDATA #REQUIRED
+                   name           CDATA "ModsParam.xml"
+                   description    CDATA "CM3D2.AddModsSlider.Plugin の各modスライダーのパラメータ定義用XML">
+    <!ELEMENT mod (value*)>
+    <!ATTLIST mod id              CDATA #REQUIRED
+                  description     CDATA ""
+                  type            CDATA "slider"
+                  on_wideslider   CDATA "false"
+                  visible         CDATA "true">
+    <!ELEMENT value EMPTY>
+    <!ATTLIST value prop_name     CDATA #REQUIRED
+                    min           CDATA "0"
+                    max           CDATA "10"
+                    label         CDATA ""
+                    type          CDATA "num"
+                    default       CDATA "NaN"
+                    visible       CDATA "true">
+] >
+
+<!--
+    設置場所 : \CM3D2\UnityInjector\Config\ModsParam.xml
+
+    書式説明 : CM3D2.AddModsSlider.Plugin.0.1.2.17 以降に対応
+
+    <mod id="EYEBALL"                    : 必須。modの識別名。拡張セーブデータを参照。
+         description="..."               : 省略可。規定値は空白。modの説明。
+         type="slider"                   : 省略可。規定値は"slider"。"toggle"でOn/Offボタン(<value />タグ不要)、"toggle,slider"でOn/Offボタン付きスライダー。
+         on_wideslider="false"           : 省略可。規定値は"false"。"true"指定するとWIDESLIDER無効時に非表示になる。WIDESLIDER前提のmod用。
+         visible="true"                  : 省略可。規定値は"true"。"false"指定でこのmodのスライダーを表示させない。
+    >
+    
+        <value prop_name="EYEBALL.width" : 必須。valueの識別名。拡張セーブデータを参照。
+               min="0.1"                 : 省略可。規定値は"0"。スライダーの最小値。
+               max="2.0"                 : 省略可。規定値は"10"。スライダーの最大値。
+               label="横"                : 省略可。規定値は空白。スライダーのラベル。
+               type="scale"              : 省略可。規定値は"num"。「倍率」なら"scale"。「整数値」なら"int"。
+               default="1.0"          	 : 省略可。規定値は"NaN"。valueの初期値。(省略時はtype="num"or"int"の時は"0"、type="scale"の時は"1"として扱う)。
+               visible="true"            : 省略可。規定値は"true"。"false"指定でこのvalueのスライダーを表示させない。
+        />
+
+        <value prop_name="EYEBALL.height" min="0.1" max="2.0" label="縦" type="scale" />
+                                         : <value ... /> の一行表記。
+
+        ...                              : modが必要とする入力数値分だけ、 <value ... /> を記載する。
+    </mod>
+-->
+
+
+<mods format="1.21" name="ModsParam.xml"
+      description="XML for parameter definition of each mod slider of CM3D2.AddModsSlider.Plugin">
+
+    <mod id="WIDESLIDER"      type="toggle" description="Enable sliders" />
+    <mod id="PROPSET_OFF"     type="toggle" description="Disable @PropSet correction" />
+    <mod id="LIPSYNC_OFF"     type="toggle" description="Disable lipsync" />
+    <mod id="HYOUJOU_OFF"     type="toggle" description="Disable face expressions" />
+    <mod id="EYETOCAMERA_OFF" type="toggle" description="Disable @EyeToCamera" />
+    <mod id="MUHYOU"          type="toggle" description="Disable all face actions" />
+    <mod id="FARMFIX"         type="toggle" description="Forearm distortion correction" on_wideslider="true" />
+    <mod id="FACE_OFF"        type="toggle" description="Disable all @Face expression changes" />
+    <mod id="FACEBLEND_OFF"   type="toggle" description="Disable all @FaceBlend expression changes" />
+
+    <mod id="EYETOCAM" description="Eyes to cam" >
+        <value prop_name="EYETOCAM" type="int" min="-1" max="1" label="value" />
+    </mod>
+    
+    <mod id="HEADTOCAM" description="Head to cam" >
+        <value prop_name="HEADTOCAM" type="int" min="-1" max="1" label="value" />
+    </mod>
+
+    <mod id="PITCH" description="Voice pitch" >
+        <value prop_name="PITCH" type="num" min="-1" max="1" default="0" label="value" />
+    </mod>
+
+    <mod id="MABATAKI" description="Eyes openness" >
+        <value prop_name="MABATAKI" type="num" min="0" max="1.0" default="1.0" label="value" />
+    </mod>
+
+    <mod id="LIPSYNC_INTENISTY" description="Lipsync intensity" type="toggle,slider" >
+        <value prop_name="LIPSYNC_INTENISTY.value" type="num" min="0.0" max="1.0" default="1.0" label="value" />
+    </mod>
+
+    <mod id="HEAD_TRACK" description="Head/eye movement/following range" type="toggle,slider">
+        <value prop_name="HEAD_TRACK.frontangle"      type="num"   min="-90" max="90"  default="0"    label="up/down face direction" />
+        <value prop_name="HEAD_TRACK.headrateup"      type="num"   min="0"   max="1"   default="1"    label="up tracking rate" />
+        <value prop_name="HEAD_TRACK.headratedown"    type="num"   min="0"   max="1"   default="1"    label="down tracking rate" />
+        <value prop_name="HEAD_TRACK.headratehorizon" type="num"   min="0"   max="1"   default="1"    label="side tracking rate" />
+        <value prop_name="HEAD_TRACK.inclinerate"     type="num"   min="-1"  max="1"   default="0"    label="head incline" />
+        <value prop_name="HEAD_TRACK.lateral"         type="num"   min="0"   max="90"  default="30"   label="side tracking range" />
+        <value prop_name="HEAD_TRACK.above"           type="num"   min="-90" max="90"  default="30"   label="up tracking range" />
+        <value prop_name="HEAD_TRACK.below"           type="num"   min="-90" max="90"  default="15"   label="down tracking range" />
+        <value prop_name="HEAD_TRACK.behind"          type="scale" min="0"   max="180" default="90"   label="max tracking range" />
+        <value prop_name="HEAD_TRACK.speed"           type="num"   min="0"   max="1.0" default="0.04" label="tracking speed" />
+        <value prop_name="HEAD_TRACK.ofsx"            type="num"   min="-90" max="90"  default="0"    label="horiz head Offset (right＜0＜left)" />
+        <value prop_name="HEAD_TRACK.ofsy"            type="num"   min="-90" max="90"  default="0"    label="vert head Offset (down＜0＜up) " />
+        <value prop_name="HEAD_TRACK.ofsz"            type="num"   min="-90" max="90"  default="0"    label="head incline Offset (right＜0＜left)" />
+
+        <value prop_name="EYE_TRACK.inside"           type="num"   min="0"   max="90"  default="35"   label="eyes inside tracking range" />
+        <value prop_name="EYE_TRACK.outside"          type="num"   min="0"   max="90"  default="65"   label="eyes outside tracking range" />
+        <value prop_name="EYE_TRACK.above"            type="num"   min="-90" max="90"  default="10"   label="eyes up tracking range" />
+        <value prop_name="EYE_TRACK.below"            type="num"   min="-90" max="90"  default="20"   label="eyes down tracking range" />
+        <value prop_name="EYE_TRACK.behind"           type="scale" min="0"   max="180" default="170"  label="max eyes tracking range" />
+        <value prop_name="EYE_TRACK.speed"            type="num"   min="0"   max="1.0" default="0.07" label="eyes tracking speed" />
+        <value prop_name="EYE_TRACK.ofsx"             type="num"   min="-90" max="90"  default="0"    label="horiz eyes Offset (close＜0＜far)" />
+        <value prop_name="EYE_TRACK.ofsy"             type="num"   min="-90" max="90"  default="0"    label="vert eyes Offset (down＜0＜up)" />
+    </mod>
+
+    <mod id="EYEBALL" description="Pupil size" >
+        <value prop_name="EYEBALL.width"  type="scale" min="0.1" max="2.0" default="1.0" label="Horizontal" />
+        <value prop_name="EYEBALL.height" type="scale" min="0.1" max="2.0" default="1.0" label="Vertical" />
+    </mod>
+
+    <mod id="EYE_ANG" description="Eye angle" on_wideslider="true" >
+        <value prop_name="EYE_ANG.angle" type="num" min="-60"  max="60"  default="0" label="Angle" />
+        <value prop_name="EYE_ANG.x"     type="num" min="-200" max="200" default="0" label="Height" />
+        <value prop_name="EYE_ANG.y"     type="num" min="-200" max="200" default="0" label="Distance" />
+    </mod>
+
+	<mod id="EYELASHES" description="Eyelash color(Needs EyelashesAlpha)" type="toggle,slider">
+        <value prop_name="EYELASHES.r" type="num" min="0" max="4" default="1.0" label="R" />
+        <value prop_name="EYELASHES.g" type="num" min="0" max="4" default="1.0" label="G" />
+        <value prop_name="EYELASHES.b" type="num" min="0" max="4" default="1.0" label="B" />
+        <value prop_name="EYELASHES.a" type="num" min="0" max="4" default="1.0" label="A" />
+    </mod>
+
+	<mod id="EYEPOSYZ_SEPARATE" description="Eye position(independent)[Needs SeperateEyeParams]" type="toggle,slider">
+        <value prop_name="EYEPOSY_SEPARATE.eyer" type="num" min="-100" max="100" default="0" label="right pupil up/down" />
+        <value prop_name="EYEPOSY_SEPARATE.eyel" type="num" min="-100" max="100" default="0" label="left pupil up/down" />
+        <value prop_name="EYEPOSZ_SEPARATE.eyer" type="num" min="-100" max="100" default="0" label="right pupil left/right" />
+        <value prop_name="EYEPOSZ_SEPARATE.eyel" type="num" min="-100" max="100" default="0" label="left pupil left/right" />
+    </mod>
+
+    <mod id="NECKSCL" description="Neck scale" on_wideslider="true">
+        <value prop_name="NECKSCL.width"  type="scale" min="0.1" max="3.0" default="1.0" label="Width" />
+        <value prop_name="NECKSCL.depth"  type="scale" min="0.1" max="3.0" default="1.0" label="Depth" />
+        <value prop_name="NECKSCL.height" type="scale" min="0.1" max="3.0" default="1.0" label="Height" />
+    </mod>
+
+    <mod id="NECKPOS" description="Neck position" on_wideslider="true" >
+        <value prop_name="NECKPOS.x" type="num" min="-1" max="1" default="0.0" label="Vertical" />
+        <value prop_name="NECKPOS.y" type="num" min="-1" max="1" default="0.0" label="Back-front" />
+        <value prop_name="NECKPOS.z" type="num" min="-1" max="1" default="0.0" label="Horizontal" visible="false" />
+    </mod>
+
+    <mod id="CLVSCL" description="Clavicle scale"  on_wideslider="true" >
+        <value prop_name="CLVSCL.width"  type="scale" min="0.1" max="3.0" default="1.0" label="Height" />
+        <value prop_name="CLVSCL.depth"  type="scale" min="0.1" max="3.0" default="1.0" label="Depth" />
+        <value prop_name="CLVSCL.height" type="scale" min="0.1" max="3.0" default="1.0" label="Width" />
+    </mod>
+
+    <mod id="CLVPOS" description="Clavicle position"  on_wideslider="true" >
+        <value prop_name="CLVPOS.x" type="num" min="-1" max="1" default="0.0" label="Vertical" />
+        <value prop_name="CLVPOS.y" type="num" min="-1" max="1" default="0.0" label="Back-front" />
+        <value prop_name="CLVPOS.z" type="num" min="-1" max="1" default="0.0" label="Horizontal" />
+    </mod>
+
+    <mod id="KATASCL" description="Shoulders scale" on_wideslider="true">
+        <value prop_name="KATASCL.width"  type="scale" min="0.1" max="3.0" default="1.0" label="Width" />
+        <value prop_name="KATASCL.depth"  type="scale" min="0.1" max="3.0" default="1.0" label="Depth" />
+        <value prop_name="KATASCL.height" type="scale" min="0.1" max="3.0" default="1.0" label="Height" />
+    </mod>
+
+    <mod id="UPARMSCL" description="Upper arm scale" on_wideslider="true">
+        <value prop_name="UPARMSCL.width"  type="scale" min="0.1" max="3.0" default="1.0" label="Width" />
+        <value prop_name="UPARMSCL.depth"  type="scale" min="0.1" max="3.0" default="1.0" label="Depth" />
+        <value prop_name="UPARMSCL.height" type="scale" min="0.1" max="3.0" default="1.0" label="Height" />
+    </mod>
+
+    <mod id="FARMSCL" description="Forearm scale(FARMFIX=OFF only)" on_wideslider="true">
+        <value prop_name="FARMSCL.width"  type="scale" min="0.1" max="3.0" default="1.0" label="Width" />
+        <value prop_name="FARMSCL.depth"  type="scale" min="0.1" max="3.0" default="1.0" label="Depth" />
+        <value prop_name="FARMSCL.height" type="scale" min="0.1" max="3.0" default="1.0" label="Height" />
+    </mod>
+
+    <mod id="HANDSCL" description="Hand scale" on_wideslider="true">
+        <value prop_name="HANDSCL.width"  type="scale" min="0.1" max="3.0" default="1.0" label="Width" />
+        <value prop_name="HANDSCL.depth"  type="scale" min="0.1" max="3.0" default="1.0" label="Depth" />
+        <value prop_name="HANDSCL.height" type="scale" min="0.1" max="3.0" default="1.0" label="Height" />
+    </mod>
+
+    <mod id="MUNESCL" description="Breast scale" on_wideslider="true">
+        <value prop_name="MUNESCL.width"  type="scale" min="0.1" max="3.0" default="1.0" label="Width" />
+        <value prop_name="MUNESCL.depth"  type="scale" min="0.1" max="3.0" default="1.0" label="Height" />
+        <value prop_name="MUNESCL.height" type="scale" min="0.1" max="3.0" default="1.0" label="Depth" />
+    </mod>
+
+    <mod id="MUNEPOS" description="Breast position" on_wideslider="true">
+        <value prop_name="MUNEPOS.x" type="num" min="-1" max="1" default="0" label="Horizontal" />
+        <value prop_name="MUNEPOS.z" type="num" min="-1" max="1" default="0" label="Height" />
+        <value prop_name="MUNEPOS.y" type="num" min="-1" max="1" default="0" label="Back-front" />
+    </mod>
+
+    <mod id="MUNESUBSCL" description="Breast subscale" on_wideslider="true">
+        <value prop_name="MUNESUBSCL.width"  type="scale" min="0.1" max="3.0" default="1.0" label="Width" />
+        <value prop_name="MUNESUBSCL.depth"  type="scale" min="0.1" max="3.0" default="1.0" label="Height" />
+        <value prop_name="MUNESUBSCL.height" type="scale" min="0.1" max="3.0" default="1.0" label="Depth" />
+    </mod>
+
+    <mod id="MUNESUBPOS" description="Breast subposition" on_wideslider="true">
+        <value prop_name="MUNESUBPOS.x" type="num" min="-1" max="1" default="0" label="Horizontal" />
+        <value prop_name="MUNESUBPOS.z" type="num" min="-1" max="1" default="0" label="Height" />
+        <value prop_name="MUNESUBPOS.y" type="num" min="-1" max="1" default="0" label="Back-front" />
+    </mod>
+
+    <mod id="S1ABASESCL" description="Upper torso scale" on_wideslider="true">
+        <value prop_name="S1ABASESCL.width"  type="scale" min="0.1" max="3.0" default="1.0" label="Width" />
+        <value prop_name="S1ABASESCL.depth"  type="scale" min="0.1" max="3.0" default="1.0" label="Depth" />
+        <value prop_name="S1ABASESCL.height" type="scale" min="0.1" max="3.0" default="1.0" label="Height" visible="false" />
+    </mod>
+
+    <mod id="S1ASCL" description="Torso scale" on_wideslider="true">
+        <value prop_name="S1ASCL.width"  type="scale" min="0.1" max="3.0" default="1.0" label="Width" />
+        <value prop_name="S1ASCL.depth"  type="scale" min="0.1" max="3.0" default="1.0" label="Depth" />
+        <value prop_name="S1ASCL.height" type="scale" min="0.1" max="3.0" default="1.0" label="Height" />
+    </mod>
+
+    <mod id="S1ASCL" description="Upper chest scale" on_wideslider="true">
+        <value prop_name="S1ASCL.width"  type="scale" min="0.1" max="3.0" default="1.0" label="Width" />
+        <value prop_name="S1ASCL.depth"  type="scale" min="0.1" max="3.0" default="1.0" label="Depth" />
+        <value prop_name="S1ASCL.height" type="scale" min="0.1" max="3.0" default="1.0" label="Height" />
+    </mod>
+
+    <mod id="S1APOS" description="Upper chest position" on_wideslider="true" >
+        <value prop_name="S1APOS.x" type="num" min="-1" max="1" default="0.0" label="Vertical" />
+        <value prop_name="S1APOS.y" type="num" min="-1" max="1" default="0.0" label="Back-front" />
+        <value prop_name="S1APOS.z" type="num" min="-1" max="1" default="0.0" label="Horizontal" visible="false" />
+    </mod>
+
+    <mod id="S1_SCL" description="Lower chest scale" on_wideslider="true">
+        <value prop_name="S1_SCL.width"  type="scale" min="0.1" max="3.0" default="1.0" label="Width" />
+        <value prop_name="S1_SCL.depth"  type="scale" min="0.1" max="3.0" default="1.0" label="Depth" />
+        <value prop_name="S1_SCL.height" type="scale" min="0.1" max="3.0" default="1.0" label="Height" />
+    </mod>
+
+    <mod id="S1POS" description="Lower chest position" on_wideslider="true" >
+        <value prop_name="S1POS.x" type="num" min="-1" max="1" default="0.0" label="Vertical" />
+        <value prop_name="S1POS.y" type="num" min="-1" max="1" default="0.0" label="Back-front" />
+        <value prop_name="S1POS.z" type="num" min="-1" max="1" default="0.0" label="Horizontal" visible="false" />
+    </mod>
+
+    <mod id="S0ASCL" description="Upper abdomen scale" on_wideslider="true">
+        <value prop_name="S0ASCL.width"  type="scale" min="0.1" max="3.0" default="1.0" label="Width" />
+        <value prop_name="S0ASCL.depth"  type="scale" min="0.1" max="3.0" default="1.0" label="Depth" />
+        <value prop_name="S0ASCL.height" type="scale" min="0.1" max="3.0" default="1.0" label="Height" />
+    </mod>
+
+    <mod id="S0APOS" description="Upper abdomen position" on_wideslider="true" >
+        <value prop_name="S0APOS.x" type="num" min="-1" max="1" default="0.0" label="Vertical" />
+        <value prop_name="S0APOS.y" type="num" min="-1" max="1" default="0.0" label="Back-front" />
+        <value prop_name="S0APOS.z" type="num" min="-1" max="1" default="0.0" label="Horizontal" visible="false" />
+    </mod>
+
+    <mod id="SPISCL" description="Lower abdomen scale" on_wideslider="true">
+        <value prop_name="SPISCL.width"  type="scale" min="0.1" max="3.0" default="1.0" label="Width" />
+        <value prop_name="SPISCL.depth"  type="scale" min="0.1" max="3.0" default="1.0" label="Depth" />
+        <value prop_name="SPISCL.height" type="scale" min="0.1" max="3.0" default="1.0" label="Height" />
+    </mod>
+
+    <mod id="SPIPOS" description="Lower abdomen position" on_wideslider="true" >
+        <value prop_name="SPIPOS.x" type="num" min="-1" max="1" default="0.0" label="Back-front" />
+        <value prop_name="SPIPOS.y" type="num" min="-1" max="1" default="0.0" label="Vertical" visible="false" />
+        <value prop_name="SPIPOS.z" type="num" min="-1" max="1" default="0.0" label="Vertical" />
+    </mod>
+
+    <mod id="SKTSCL" description="Skirt scale" on_wideslider="true">
+        <value prop_name="SKTSCL.width"  type="scale" min="0.1" max="3.0" default="1.0" label="Width" />
+        <value prop_name="SKTSCL.depth"  type="scale" min="0.1" max="3.0" default="1.0" label="Depth" />
+        <value prop_name="SKTSCL.height" type="scale" min="0.1" max="3.0" default="1.0" label="Height" />
+    </mod>
+
+    <mod id="SKTPOS" description="Skirt position"  on_wideslider="true" >
+        <value prop_name="SKTPOS.x" type="num" min="-1" max="1" default="0.0" label="Horizontal" visible="false" />
+        <value prop_name="SKTPOS.y" type="num" min="-1" max="1" default="0.0" label="Back-front" visible="false" />
+        <value prop_name="SKTPOS.z" type="num" min="-1" max="1" default="0.0" label="Vertical" />
+    </mod>
+
+    <mod id="PELSCL" description="Pelvis scale" on_wideslider="true" >
+        <value prop_name="PELSCL.width"  type="scale" min="0.1" max="2.0" default="1.0" label="Width" />
+        <value prop_name="PELSCL.depth"  type="scale" min="0.1" max="2.0" default="1.0" label="Depth" />
+        <value prop_name="PELSCL.height" type="scale" min="0.1" max="2.0" default="1.0" label="Height" />
+    </mod>
+
+    <mod id="HIPSCL" description="Hip scale" on_wideslider="true" >
+        <value prop_name="HIPSCL.width"  type="scale" min="0.1" max="2.0" default="1.0" label="Width" />
+        <value prop_name="HIPSCL.depth"  type="scale" min="0.1" max="2.0" default="1.0" label="Depth" />
+        <value prop_name="HIPSCL.height" type="scale" min="0.1" max="2.0" default="1.0" label="Height" />
+    </mod>
+
+    <mod id="HIPPOS" description="Hip position" on_wideslider="true" >
+        <value prop_name="HIPPOS.x" type="num" min="-100" max="200" default="0.0" label="Horizontal" />
+        <value prop_name="HIPPOS.y" type="num" min="-100" max="200" default="0.0" label="Vertical" />
+        <value prop_name="HIPPOS.z" type="num" min="-100" max="200" default="0.0" label="Back-front" />
+    </mod>
+
+    <mod id="THISCL" description="Leg scale"  on_wideslider="true" >
+        <value prop_name="THISCL.width"  type="scale" min="0.1" max="2.0" default="1.0" label="Width" />
+        <value prop_name="THISCL.depth"  type="scale" min="0.1" max="2.0" default="1.0" label="Depth" />
+        <value prop_name="THISCL.height" type="scale" min="0.1" max="2.0" default="1.0" label="Height" visible="false" />
+    </mod>
+
+    <mod id="THIPOS" description="Leg position" on_wideslider="true" >
+        <value prop_name="THIPOS.x" type="num" min="-100" max="200" default="0.0" label="Horizontal" />
+        <value prop_name="THIPOS.y" type="num" min="-100" max="200" default="0.0" label="Vertical" visible="false" />
+        <value prop_name="THIPOS.z" type="num" min="-100" max="200" default="0.0" label="Back-front" />
+    </mod>
+
+    <mod id="MTWSCL" description="Thigh scale"  on_wideslider="true" >
+        <value prop_name="MTWSCL.width"  type="scale" min="0.1" max="2.0" default="1.0" label="Width" />
+        <value prop_name="MTWSCL.depth"  type="scale" min="0.1" max="2.0" default="1.0" label="Depth" />
+        <value prop_name="MTWSCL.height" type="scale" min="0.1" max="2.0" default="1.0" label="Height" />
+    </mod>
+
+    <mod id="MTWPOS" description="Thigh position" on_wideslider="true" >
+        <value prop_name="MTWPOS.x" type="num" min="-1" max="1" default="0.0" label="Height" />
+        <value prop_name="MTWPOS.y" type="num" min="-1" max="1" default="0.0" label="Back-front" />
+        <value prop_name="MTWPOS.z" type="num" min="-1" max="1" default="0.0" label="Distance" />
+    </mod>
+
+    <mod id="MMNSCL" description="Rear thigh scale"  on_wideslider="true" >
+        <value prop_name="MMNSCL.width"  type="scale" min="0.1" max="2.0" default="1.0" label="Width" />
+        <value prop_name="MMNSCL.depth"  type="scale" min="0.1" max="2.0" default="1.0" label="Depth" />
+        <value prop_name="MMNSCL.height" type="scale" min="0.1" max="2.0" default="1.0" label="Height" />
+    </mod>
+
+    <mod id="MMNPOS" description="Rear thigh position" on_wideslider="true" >
+        <value prop_name="MMNPOS.x" type="num" min="-1" max="1" default="0.0" label="Height" />
+        <value prop_name="MMNPOS.y" type="num" min="-1" max="1" default="0.0" label="Back-front" />
+        <value prop_name="MMNPOS.z" type="num" min="-1" max="1" default="0.0" label="Distance" />
+    </mod>
+
+    <mod id="THISCL2" description="Knee scale"  on_wideslider="true" >
+        <value prop_name="THISCL2.width"  type="scale" min="0.1" max="2.0" default="1.0" label="Width" />
+        <value prop_name="THISCL2.depth"  type="scale" min="0.1" max="2.0" default="1.0" label="Depth" />
+        <value prop_name="THISCL2.height" type="scale" min="0.1" max="2.0" default="1.0" label="Height" visible="false" />
+    </mod>
+
+    <mod id="THI2POS" description="Knee position" on_wideslider="true" >
+        <value prop_name="THI2POS.x" type="num" min="-100" max="200" default="0.0" label="Horizontal" />
+        <value prop_name="THI2POS.y" type="num" min="-100" max="200" default="0.0" label="Vertical" />
+        <value prop_name="THI2POS.z" type="num" min="-100" max="200" default="0.0" label="Back-front" />
+    </mod>
+
+    <mod id="CALFSCL" description="Calf scale"  on_wideslider="true" >
+        <value prop_name="CALFSCL.width"  type="scale" min="0.1" max="2.0" default="1.0" label="Width" />
+        <value prop_name="CALFSCL.depth"  type="scale" min="0.1" max="2.0" default="1.0" label="Depth" />
+        <value prop_name="CALFSCL.height" type="scale" min="0.1" max="2.0" default="1.0" label="Height" visible="false" />
+    </mod>
+
+    <mod id="FOOTSCL" description="Foot scale"  on_wideslider="true" >
+        <value prop_name="FOOTSCL.width"  type="scale" min="0.1" max="2.0" default="1.0" label="Width" />
+        <value prop_name="FOOTSCL.depth"  type="scale" min="0.1" max="2.0" default="1.0" label="Depth" />
+        <value prop_name="FOOTSCL.height" type="scale" min="0.1" max="2.0" default="1.0" label="Height" />
+    </mod>
+</mods>

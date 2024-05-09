@@ -11,6 +11,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Update="ModsParam.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="BepInEx.BaseLib" Version="5.4.19" />
     <PackageReference Include="COM3D2.GameLibs" Version="2.25.2-r.0" />
     <PackageReference Include="UnityEngine" Version="5.6.1" />
