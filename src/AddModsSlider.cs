@@ -14,6 +14,8 @@ namespace CM3D2.AddModsSlider.Plugin;
 
 //[PluginFilter("CM3D2x64"), PluginFilter("CM3D2x86"), PluginFilter("CM3D2VRx64")]
 [BepInPlugin("CM3D2.AddModsSlider", "AddModsSlider", "0.1.3.6")]
+[BepInDependency("CM3D2.ExternalSaveData")]
+[BepInDependency("CM3D2.ExternalPreset")]
 public class AddModsSlider : BaseUnityPlugin {
 
 	#region Constants
