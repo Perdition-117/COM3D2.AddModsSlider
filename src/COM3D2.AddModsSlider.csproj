@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net35</TargetFramework>
     <LangVersion>10</LangVersion>
+    <AssemblyName>COM3D2.AddModsSlider.Plugin</AssemblyName>
   </PropertyGroup>
 
   <PropertyGroup>
