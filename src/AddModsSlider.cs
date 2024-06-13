@@ -437,7 +437,7 @@ public class AddModsSlider : BaseUnityPlugin {
 			_uiScrollPanel.transform.localPosition = new(-25f, -systemUnitHeight, 0f);
 
 			var uiScrollView = _uiScrollPanel.gameObject.AddComponent<UIScrollView>();
-			uiScrollView.contentPivot = UIWidget.Pivot.Center;
+			uiScrollView.contentPivot = UIWidget.Pivot.Top;
 			uiScrollView.movement = UIScrollView.Movement.Vertical;
 			uiScrollView.scrollWheelFactor = 1.5f;
 
@@ -752,6 +752,7 @@ public class AddModsSlider : BaseUnityPlugin {
 			#endregion
 
 			_uiTable.Reposition();
+			uiScrollView.ResetPosition();
 			goUiPanel.SetActive(false);
 			toggleActiveOnWideSlider();
 
