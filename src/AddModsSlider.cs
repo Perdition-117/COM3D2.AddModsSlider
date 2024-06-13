@@ -216,7 +216,6 @@ public class AddModsSlider : BaseUnityPlugin {
 			if (parameter.IsToggle()) {
 				parameter.Enabled = false;
 				SetExternalSaveData(key);
-				NotifyMaidVoicePitchOnChange();
 				SetButtonColor(key, parameter.Enabled);
 			}
 
@@ -230,6 +229,7 @@ public class AddModsSlider : BaseUnityPlugin {
 			}
 		}
 
+		NotifyMaidVoicePitchOnChange();
 		toggleActiveOnWideSlider();
 	}
 
