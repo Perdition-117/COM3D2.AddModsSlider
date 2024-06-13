@@ -7,20 +7,18 @@ using BepInEx;
 using BepInEx.Logging;
 using CM3D2.ExternalPreset.Managed;
 using CM3D2.ExternalSaveData.Managed;
+using COM3D2.AddModsSlider;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace CM3D2.AddModsSlider.Plugin;
 
-[BepInPlugin("COM3D2.AddModsSlider", "AddModsSlider", "0.1.3.6")]
+[BepInPlugin("COM3D2.AddModsSlider", MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
 [BepInDependency("COM3D2.ExternalSaveData")]
 [BepInDependency("COM3D2.ExternalPresetData")]
 public class AddModsSlider : BaseUnityPlugin {
 
 	#region Constants
-
-	public const string PluginName = "AddModsSlider";
-	public const string Version = "0.1.3.6";
 
 	private const string MaidVoicePitchPluginId = "CM3D2.MaidVoicePitch";
 
@@ -515,7 +513,7 @@ public class AddModsSlider : BaseUnityPlugin {
 			uiLabelTitleTab.color = Color.white;
 			uiLabelTitleTab.trueTypeFont = _font;
 			uiLabelTitleTab.fontSize = 18;
-			uiLabelTitleTab.text = "Mods Slider " + Version;
+			uiLabelTitleTab.text = "Mods Slider " + MyPluginInfo.PLUGIN_VERSION;
 
 			var controlWidth = (int)(uiBGSprite.width - _uiTable.padding.x * 2);
 			var baseTop = (int)(uiBGSprite.height / 2f - 50);

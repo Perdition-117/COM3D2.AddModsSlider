@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Xml;
 using BepInEx;
+using COM3D2.AddModsSlider;
 
 namespace CM3D2.AddModsSlider.Plugin;
 
@@ -67,7 +68,7 @@ internal class ModParameters {
 
 		var xmlFormat = ((XmlElement)mods).GetAttribute("format");
 		if (xmlFormat != "1.2" && xmlFormat != "1.21") {
-			AddModsSlider.LogError($"AddModsSlider v{AddModsSlider.Version} requires ModsParam.xml format=\"1.2\" or \"1.21\".");
+			AddModsSlider.LogError($"AddModsSlider v{MyPluginInfo.PLUGIN_VERSION} requires ModsParam.xml format=\"1.2\" or \"1.21\".");
 			return false;
 		}
 
