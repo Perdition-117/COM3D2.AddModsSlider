@@ -439,6 +439,7 @@ public class AddModsSlider : BaseUnityPlugin {
 			var uiScrollView = _uiScrollPanel.gameObject.AddComponent<UIScrollView>();
 			uiScrollView.contentPivot = UIWidget.Pivot.Top;
 			uiScrollView.movement = UIScrollView.Movement.Vertical;
+			uiScrollView.dragEffect = UIScrollView.DragEffect.Momentum;
 			uiScrollView.scrollWheelFactor = 1.5f;
 
 			uiBGSprite.gameObject.AddComponent<UIDragScrollView>().scrollView = uiScrollView;
