@@ -202,6 +202,7 @@ public class AddModsSlider : BaseUnityPlugin {
 		}
 
 		NotifyMaidVoicePitchOnChange();
+		toggleActiveOnWideSlider();
 	}
 
 	public void OnClickUndoButton() {
@@ -230,6 +231,8 @@ public class AddModsSlider : BaseUnityPlugin {
 				}
 			}
 		}
+
+		toggleActiveOnWideSlider();
 	}
 
 	public void OnClickResetButton() {
@@ -752,6 +755,7 @@ public class AddModsSlider : BaseUnityPlugin {
 
 			_uiTable.Reposition();
 			goUiPanel.SetActive(false);
+			toggleActiveOnWideSlider();
 
 			//WriteTrans("UI Root");
 		} catch (Exception ex) {
@@ -966,6 +970,8 @@ public class AddModsSlider : BaseUnityPlugin {
 					}
 				}
 			}
+
+			toggleActiveOnWideSlider();
 		} catch (Exception ex) {
 			Logger.LogError($"{nameof(syncExSaveDatatoSlider)}() {ex}");
 		}
