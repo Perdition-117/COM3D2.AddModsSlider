@@ -147,7 +147,7 @@ public class AddModsSlider : BaseUnityPlugin {
 			NotifyMaidVoicePitchOnChange();
 
 			// WIDESLIDER有効化/無効化に合わせて、依存項目UIを表示/非表示
-			if (key == "WIDESLIDER") {
+			if (key == ModParameters.WideSliderId) {
 				toggleActiveOnWideSlider();
 			}
 		}
@@ -943,7 +943,7 @@ public class AddModsSlider : BaseUnityPlugin {
 
 		foreach (var parameter in _modParameters.Parameters) {
 			if (parameter.IsToggle()) {
-				parameter.Enabled = ExSaveData.GetBool(_currentMaid, MaidVoicePitchPluginId, parameter.Name, false);
+				parameter.Enabled = ExSaveData.GetBool(_currentMaid, MaidVoicePitchPluginId, parameter.Name, parameter.Name == ModParameters.WideSliderId);
 				parameter.WasEnabled = parameter.Enabled;
 				Logger.LogDebug($"{parameter.Name,-32} = {parameter.Enabled,5}");
 			}

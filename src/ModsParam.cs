@@ -7,6 +7,8 @@ using COM3D2.AddModsSlider;
 namespace CM3D2.AddModsSlider.Plugin;
 
 internal class ModParameters {
+	public const string WideSliderId = "WIDESLIDER";
+
 	public readonly string DefMatchPattern = @"([-+]?[0-9]*\.?[0-9]+)";
 	public readonly string XmlFileName = Path.Combine(Paths.ConfigPath, "ModsParam.xml");
 
@@ -53,7 +55,7 @@ internal class ModParameters {
 	
 	public Parameter GetParameter(string name) => _parametersDictionary[name];
 
-	public bool WideSliderIsEnabled() => TryGetParameter("WIDESLIDER", out var wideSlider) && wideSlider.Enabled;
+	public bool WideSliderIsEnabled() => TryGetParameter(WideSliderId, out var wideSlider) && wideSlider.Enabled;
 
 	private bool LoadModParameters() {
 		if (!File.Exists(XmlFileName)) {
