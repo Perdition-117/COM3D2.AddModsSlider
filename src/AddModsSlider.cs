@@ -188,7 +188,6 @@ public class AddModsSlider : BaseUnityPlugin {
 			if (parameter.IsToggle()) {
 				parameter.Enabled = parameter.WasEnabled;
 				SetExternalSaveData(key);
-				NotifyMaidVoicePitchOnChange();
 				SetButtonColor(key, parameter.Enabled);
 			}
 
@@ -201,6 +200,8 @@ public class AddModsSlider : BaseUnityPlugin {
 				}
 			}
 		}
+
+		NotifyMaidVoicePitchOnChange();
 	}
 
 	public void OnClickUndoButton() {
