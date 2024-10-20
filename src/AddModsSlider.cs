@@ -879,9 +879,20 @@ public class AddModsSlider : BaseUnityPlugin {
 	private void SetSliderVisible(string key, bool enable) {
 		foreach (Transform transform in _modControlsDictionary[key].ModUnit) {
 			var type = GetTag(transform, 0);
-			if (type == "SliderUnit" || type == "Spacer") transform.gameObject.SetActive(enable);
+			if (type == "SliderUnit" || type == "Spacer") {
+				transform.gameObject.SetActive(enable);
+			}
 		}
 
+		// retain scroll offset from top, making headers "stay in place" when toggled
+		var scrollView = _uiScrollPanel.gameObject.GetComponent<UIScrollView>();
+		var preExtents = scrollView.bounds.extents;
+		_uiTable.Reposition();
+		var diff = scrollView.bounds.extents - preExtents;
+		_uiScrollPanel.clipOffset += new Vector2(diff.x, diff.y);
+		_uiScrollPanel.transform.localPosition -= diff;
+
+		// fixes position if header at bottom was collapsed
 		_uiTable.repositionNow = true;
 	}
 
