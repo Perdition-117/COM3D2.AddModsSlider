@@ -41,6 +41,8 @@ public class AddModsSlider : BaseUnityPlugin {
 
 	private Font _font;
 
+	private readonly PluginSaveData _pluginSaveData = new(MaidVoicePitchPluginId);
+
 	private readonly List<ModControl> _modControls = new();
 	private readonly Dictionary<string, ModControl> _modControlsDictionary = new();
 
@@ -956,12 +958,14 @@ public class AddModsSlider : BaseUnityPlugin {
 	private void LoadExternalSaveData() {
 		Logger.LogDebug("Loading ExternalSaveData...");
 
+		var maidData = _pluginSaveData.GetMaidData(_currentMaid);
+
 		foreach (var parameter in _modParameters.Parameters) {
 			if (parameter.IsToggle()) {
-				parameter.Enabled = ExSaveData.GetBool(_currentMaid, MaidVoicePitchPluginId, parameter.Name, parameter.Name == ModParameters.WideSliderId);
+				parameter.Enabled = maidData.GetBoolean(parameter.Name, parameter.Name == ModParameters.WideSliderId);
 				if (parameter.Name == ModParameters.WideSliderId) {
 					// inform ExSaveData backend of WideSlider's state
-					ExSaveData.SetBool(_currentMaid, MaidVoicePitchPluginId, parameter.Name, parameter.Enabled);
+					maidData.SetBoolean(parameter.Name, parameter.Enabled);
 				}
 				parameter.WasEnabled = parameter.Enabled;
 				Logger.LogDebug($"{parameter.Name,-32} = {parameter.Enabled,5}");
@@ -970,7 +974,7 @@ public class AddModsSlider : BaseUnityPlugin {
 			if (parameter.IsSlider()) {
 				foreach (var prop in parameter.PropertyNames) {
 					var property = parameter.Properties[prop];
-					var f = ExSaveData.GetFloat(_currentMaid, MaidVoicePitchPluginId, prop, float.NaN);
+					var f = maidData.GetFloat(prop, float.NaN);
 					property.Value = float.IsNaN(f) ? property.DefaultValue : f;
 					property.PreviousValue = property.Value;
 					Logger.LogDebug($"{prop,-32} = {property.Value:f}");
@@ -993,7 +997,8 @@ public class AddModsSlider : BaseUnityPlugin {
 		var parameter = _modParameters.GetParameter(key);
 
 		if (parameter.IsToggle()) {
-			ExSaveData.SetBool(_currentMaid, MaidVoicePitchPluginId, parameter.Name, parameter.Enabled);
+			var maidData = _pluginSaveData.GetMaidData(_currentMaid);
+			maidData.SetBoolean(parameter.Name, parameter.Enabled);
 		}
 
 		if (parameter.IsSlider()) {
@@ -1007,7 +1012,8 @@ public class AddModsSlider : BaseUnityPlugin {
 		var property = _modParameters.GetParameter(key).Properties[prop];
 		var value = (float)Math.Round(property.Value, 3, MidpointRounding.AwayFromZero);
 
-		ExSaveData.SetFloat(_currentMaid, MaidVoicePitchPluginId, prop, value);
+		var maidData = _pluginSaveData.GetMaidData(_currentMaid);
+		maidData.SetFloat(prop, value);
 	}
 
 	#endregion
