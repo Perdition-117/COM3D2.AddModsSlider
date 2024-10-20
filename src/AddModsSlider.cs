@@ -571,8 +571,6 @@ public class AddModsSlider : BaseUnityPlugin {
 
 				modControl.Parameter = parameter;
 
-				var modDescription = $"{parameter.Description} ({key})";
-
 				// ModUnit：modタグ単位のまとめオブジェクト ScrollViewGridの子
 				var goModUnit = NGUITools.AddChild(_uiTable.gameObject);
 				goModUnit.name = "Unit:" + key;
@@ -601,7 +599,7 @@ public class AddModsSlider : BaseUnityPlugin {
 				uiLabelHeader.multiLine = false;
 				uiLabelHeader.overflowMethod = UILabel.Overflow.ClampContent;
 				uiLabelHeader.supportEncoding = true;
-				uiLabelHeader.text = $"[000000]{modDescription}[-]";
+				uiLabelHeader.text = $"[000000]{parameter.Description}[-] [C0C0C0]({key})[-]";
 				uiLabelHeader.gameObject.AddComponent<UIDragScrollView>().scrollView = uiScrollView;
 
 				// 金枠Sprite
@@ -770,8 +768,11 @@ public class AddModsSlider : BaseUnityPlugin {
 				var parameter = _modParameters.GetParameter(goKey);
 
 				if (parameter.OnWideSlider) {
-					var s = (enable ? "[000000]" : "[FF0000]WS必須 [-]") + $"{parameter.Description} ({goKey})";
-					transform.GetComponentsInChildren<UILabel>()[0].text = s;
+					var labelText = $"[000000]{parameter.Description}[-] [C0C0C0]({goKey})[-]";
+					if (!enable) {
+						labelText = "[FF0000]WS必須[-] " + labelText;
+					}
+					transform.GetComponentsInChildren<UILabel>()[0].text = labelText;
 
 					var uiButton = transform.GetComponentsInChildren<UIButton>()[0];
 					uiButton.isEnabled = enable;
