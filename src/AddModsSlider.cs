@@ -198,7 +198,8 @@ public class AddModsSlider : BaseUnityPlugin {
 			var key = parameter.Name;
 
 			if (parameter.IsToggle()) {
-				parameter.Enabled = false;
+				// everything except WideSlider defaults to disabled
+				parameter.Enabled = key == ModParameters.WideSliderId;
 				SetExternalSaveData(key);
 				SetButtonColor(key, parameter.Enabled);
 			}
