@@ -944,6 +944,10 @@ public class AddModsSlider : BaseUnityPlugin {
 		foreach (var parameter in _modParameters.Parameters) {
 			if (parameter.IsToggle()) {
 				parameter.Enabled = ExSaveData.GetBool(_currentMaid, MaidVoicePitchPluginId, parameter.Name, parameter.Name == ModParameters.WideSliderId);
+				if (parameter.Name == ModParameters.WideSliderId) {
+					// inform ExSaveData backend of WideSlider's state
+					ExSaveData.SetBool(_currentMaid, MaidVoicePitchPluginId, parameter.Name, parameter.Enabled);
+				}
 				parameter.WasEnabled = parameter.Enabled;
 				Logger.LogDebug($"{parameter.Name,-32} = {parameter.Enabled,5}");
 			}
