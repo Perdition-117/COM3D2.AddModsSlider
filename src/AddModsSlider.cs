@@ -191,6 +191,7 @@ public class AddModsSlider : BaseUnityPlugin {
 		var key = GetTag(UIButton.current, 1);
 		UndoSliderValue(key);
 		SetExternalSaveData(key);
+		NotifyMaidVoicePitchOnChange();
 	}
 
 	public void OnClickResetAll() {
@@ -222,6 +223,7 @@ public class AddModsSlider : BaseUnityPlugin {
 		var key = GetTag(UIButton.current, 1);
 		ResetSliderValue(key);
 		SetExternalSaveData(key);
+		NotifyMaidVoicePitchOnChange();
 	}
 
 	public void OnChangeSlider() {
