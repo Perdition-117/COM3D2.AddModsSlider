@@ -59,7 +59,8 @@
     <mod id="HYOUJOU_OFF"     type="toggle" description="Disable face expressions" />
     <mod id="EYETOCAMERA_OFF" type="toggle" description="Disable @EyeToCamera" />
     <mod id="MUHYOU"          type="toggle" description="Disable all face actions" />
-    <mod id="FARMFIX"         type="toggle" description="Forearm distortion correction" on_wideslider="true" />
+    <mod id="FARMFIX"         type="toggle" description="Fix forearm distortion" on_wideslider="true" />
+    <mod id="LIMBSFIX"        type="toggle" description="Fix limb distortion" on_wideslider="true" />
     <mod id="FACE_OFF"        type="toggle" description="Disable all @Face expression changes" />
     <mod id="FACEBLEND_OFF"   type="toggle" description="Disable all @FaceBlend expression changes" />
 
