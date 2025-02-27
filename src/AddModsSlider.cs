@@ -970,7 +970,6 @@ public class AddModsSlider : BaseUnityPlugin {
 					maidData.SetBoolean(parameter.Name, parameter.Enabled);
 				}
 				parameter.WasEnabled = parameter.Enabled;
-				Logger.LogDebug($"{parameter.Name,-32} = {parameter.Enabled,5}");
 			}
 
 			if (parameter.IsSlider()) {
@@ -979,7 +978,6 @@ public class AddModsSlider : BaseUnityPlugin {
 					var f = maidData.GetFloat(prop, float.NaN);
 					property.Value = float.IsNaN(f) ? property.DefaultValue : f;
 					property.PreviousValue = property.Value;
-					Logger.LogDebug($"{prop,-32} = {property.Value:f}");
 				}
 
 				if (!parameter.IsToggle()) {
