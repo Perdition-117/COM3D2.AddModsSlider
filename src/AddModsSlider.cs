@@ -26,19 +26,15 @@ public class AddModsSlider : BaseUnityPlugin {
 
 	private static ManualLogSource _logger;
 
-	private bool _xmlLoad = false;
-	private bool _isVisible = false;
 	private bool _isInitialized = false;
 
 	private ModParameters _modParameters;
 
 	private Maid _currentMaid;
 
-	private UICamera _uiCamera;
 	private UIPanel _uiPanel;
 	private UIPanel _uiScrollPanel;
 	private UITable _uiTable;
-
 	private Font _font;
 
 	private readonly PluginSaveData _pluginSaveData = new(MaidVoicePitchPluginId);
@@ -106,27 +102,35 @@ public class AddModsSlider : BaseUnityPlugin {
 
 	private void Start() {
 		SceneManager.sceneLoaded += OnSceneLoaded;
+		SceneManager.sceneUnloaded += OnSceneUnloaded;
 
 		ExPreset.loadNotify.AddListener(syncExSaveDatatoSlider);
 	}
 
 	private void OnSceneLoaded(Scene scene, LoadSceneMode mode) {
-		if (scene.name == "SceneTitle") {
-		} else if (scene.name == "SceneEdit") {
+		if (scene.name == "SceneEdit") {
 			_modParameters = new();
-			if (_xmlLoad = _modParameters.Init()) {
+			if (_modParameters.Init()) {
 				StartCoroutine(InitializeCoroutine());
 			}
-		} else {
-			Finalize();
+		}
+	}
+
+	private void OnSceneUnloaded(Scene scene) {
+		if (scene.name == "SceneEdit") {
+			_isInitialized = false;
+			_modParameters = null;
+
+			_currentMaid = null;
+
+			_modControls.Clear();
+			_modControlsDictionary.Clear();
 		}
 	}
 
 	public void Update() {
-		if (SceneManager.GetActiveScene().name == "SceneEdit" && _isInitialized) {
-			if (Input.GetKeyDown(KeyCode.F5)) {
-				_uiPanel.gameObject.SetActive(_isVisible = !_isVisible);
-			}
+		if (SceneManager.GetActiveScene().name == "SceneEdit" && _isInitialized && Input.GetKeyDown(KeyCode.F5)) {
+			_uiPanel.gameObject.SetActive(!_uiPanel.gameObject.activeSelf);
 		}
 	}
 
@@ -382,9 +386,6 @@ public class AddModsSlider : BaseUnityPlugin {
 			var uiAtlasDialog = FindAtlas("SystemDialog");
 
 			var uiRoot = GameObject.Find("UI Root");
-			var cameraObject = GameObject.Find("/UI Root/Camera");
-			var cameraComponent = cameraObject.GetComponent<Camera>();
-			_uiCamera = cameraObject.GetComponent<UICamera>();
 
 			// ボタンはgoProfileTabをコピー
 			var profileTabCopy = Instantiate(FindChild(uiRoot.transform.Find("ProfilePanel").Find("Comment").gameObject, "ProfileTab"));
@@ -502,7 +503,7 @@ public class AddModsSlider : BaseUnityPlugin {
 			uiLabelTitleTab.color = Color.white;
 			uiLabelTitleTab.trueTypeFont = _font;
 			uiLabelTitleTab.fontSize = 18;
-			uiLabelTitleTab.text = "Mods Slider " + MyPluginInfo.PLUGIN_VERSION;
+			uiLabelTitleTab.text = MyPluginInfo.PLUGIN_NAME;
 
 			var controlWidth = (int)(uiBGSprite.width - _uiTable.padding.x * 2);
 			var baseTop = (int)(uiBGSprite.height / 2f - 50);
@@ -528,8 +529,8 @@ public class AddModsSlider : BaseUnityPlugin {
 			uiLabelUndoAll.width = uiSpriteUndoAll.width - 10;
 			uiLabelUndoAll.fontSize = 22;
 			uiLabelUndoAll.spacingX = 0;
-			uiLabelUndoAll.supportEncoding = true;
-			uiLabelUndoAll.text = "[111111]UndoAll";
+			uiLabelUndoAll.color = Color.black;
+			uiLabelUndoAll.text = "Undo all";
 
 			var uiButtonUndoAll = goUndoAll.GetComponent<UIButton>();
 			uiButtonUndoAll.defaultColor = new(1f, 1f, 1f, 0.8f);
@@ -545,7 +546,7 @@ public class AddModsSlider : BaseUnityPlugin {
 			goResetAll.transform.localPosition = new(controlWidth * 0.25f - 4, baseTop - systemUnitHeight / 2f, 0f);
 
 			var uiLabelResetAll = FindChild(goResetAll, "Name").GetComponent<UILabel>();
-			uiLabelResetAll.text = "[111111]ResetAll";
+			uiLabelResetAll.text = "Reset all";
 
 			var uiButtonResetAll = goResetAll.GetComponent<UIButton>();
 			uiButtonResetAll.defaultColor = new(1f, 1f, 1f, 0.8f);
@@ -602,8 +603,9 @@ public class AddModsSlider : BaseUnityPlugin {
 				uiLabelHeader.alignment = NGUIText.Alignment.Left;
 				uiLabelHeader.multiLine = false;
 				uiLabelHeader.overflowMethod = UILabel.Overflow.ClampContent;
+				uiLabelHeader.color = Color.black;
 				uiLabelHeader.supportEncoding = true;
-				uiLabelHeader.text = $"[000000]{parameter.Description}[-] [C0C0C0]({key})[-]";
+				uiLabelHeader.text = $"{parameter.Description} [C0C0C0]({key})[-]";
 				uiLabelHeader.gameObject.AddComponent<UIDragScrollView>().scrollView = uiScrollView;
 
 				// 金枠Sprite
@@ -636,8 +638,8 @@ public class AddModsSlider : BaseUnityPlugin {
 					uiLabelUndo.width = uiSpriteUndo.width - 10;
 					uiLabelUndo.fontSize = 14;
 					uiLabelUndo.spacingX = 0;
-					uiLabelUndo.supportEncoding = true;
-					uiLabelUndo.text = "[111111]Undo";
+					uiLabelUndo.color = Color.black;
+					uiLabelUndo.text = "Undo";
 
 					var uiButtonUndo = goUndo.GetComponent<UIButton>();
 					uiButtonUndo.defaultColor = new(1f, 1f, 1f, 0.8f);
@@ -666,8 +668,8 @@ public class AddModsSlider : BaseUnityPlugin {
 					uiLabelReset.width = uiSpriteReset.width - 10;
 					uiLabelReset.fontSize = 14;
 					uiLabelReset.spacingX = 0;
-					uiLabelReset.supportEncoding = true;
-					uiLabelReset.text = "[111111]Reset";
+					uiLabelReset.color = Color.black;
+					uiLabelReset.text = "Reset";
 
 					var uiButtonReset = goReset.GetComponent<UIButton>();
 					uiButtonReset.defaultColor = new(1f, 1f, 1f, 0.8f);
@@ -746,17 +748,6 @@ public class AddModsSlider : BaseUnityPlugin {
 		return true;
 	}
 
-	private void Finalize() {
-		_isInitialized = false;
-		_isVisible = false;
-		_modParameters = null;
-
-		_currentMaid = null;
-
-		_modControls.Clear();
-		_modControlsDictionary.Clear();
-	}
-
 	public void toggleActiveOnWideSlider() => toggleActiveOnWideSlider(_modParameters.WideSliderIsEnabled());
 
 	public void toggleActiveOnWideSlider(bool enable) {
@@ -772,7 +763,7 @@ public class AddModsSlider : BaseUnityPlugin {
 				var parameter = _modParameters.GetParameter(goKey);
 
 				if (parameter.OnWideSlider) {
-					var labelText = $"[000000]{parameter.Description}[-] [C0C0C0]({goKey})[-]";
+					var labelText = $"{parameter.Description} [C0C0C0]({goKey})[-]";
 					if (!enable) {
 						labelText = "[FF0000]WS必須[-] " + labelText;
 					}
