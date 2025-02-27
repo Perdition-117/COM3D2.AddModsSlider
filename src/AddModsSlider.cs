@@ -112,7 +112,6 @@ public class AddModsSlider : BaseUnityPlugin {
 
 	private void OnSceneLoaded(Scene scene, LoadSceneMode mode) {
 		if (scene.name == "SceneTitle") {
-			_font = GameObject.Find("SystemUI Root").GetComponentsInChildren<UILabel>()[0].trueTypeFont;
 		} else if (scene.name == "SceneEdit") {
 			_modParameters = new();
 			if (_xmlLoad = _modParameters.Init()) {
@@ -387,12 +386,15 @@ public class AddModsSlider : BaseUnityPlugin {
 			var cameraComponent = cameraObject.GetComponent<Camera>();
 			_uiCamera = cameraObject.GetComponent<UICamera>();
 
-			var sliderTemplate = CreateSliderTemplate(uiRoot, uiAtlasSceneEdit);
-
 			// ボタンはgoProfileTabをコピー
 			var profileTabCopy = Instantiate(FindChild(uiRoot.transform.Find("ProfilePanel").Find("Comment").gameObject, "ProfileTab"));
 			EventDelegate.Remove(profileTabCopy.GetComponent<UIButton>().onClick, ProfileMgr.Instance.ChangeCommentTab);
 			profileTabCopy.SetActive(false);
+
+			var profileTabLabel = FindChild(profileTabCopy, "Name").GetComponent<UILabel>();
+			_font = profileTabLabel.trueTypeFont;
+
+			var sliderTemplate = CreateSliderTemplate(uiRoot, uiAtlasSceneEdit);
 
 			#region createPanel
 
